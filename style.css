@@ -1,16 +1,16 @@
 :root{
-  --bg:#0a0f1a;
-  --panel:#101827;
-  --panel-2:#151f33;
-  --border:#223049;
-  --border-soft:#1a2438;
-  --text:#e7ecf5;
-  --text-dim:#8493ad;
-  --text-faint:#546382;
-  --accent:#34e4c1;
-  --accent-dim:#1c9c86;
-  --accent-2:#f5b342;
-  --danger:#ff6b6b;
+  --bg:#f2efe6;
+  --panel:#fbfaf5;
+  --panel-2:#ece7d9;
+  --border:#ddd6c2;
+  --border-soft:#e6e0cf;
+  --text:#2b2a24;
+  --text-dim:#6f6b5c;
+  --text-faint:#9b9683;
+  --accent:#0f8f78;
+  --accent-dim:#0c705d;
+  --accent-2:#b9791a;
+  --danger:#c94a3f;
   --display:'Space Grotesk',sans-serif;
   --mono:'JetBrains Mono',monospace;
   --radius:10px;
@@ -20,8 +20,8 @@
 html,body{margin:0;padding:0;}
 body{
   background:
-    radial-gradient(1200px 500px at 15% -10%, rgba(52,228,193,.08), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(245,179,66,.06), transparent 55%),
+    radial-gradient(1200px 500px at 15% -10%, rgba(15,143,120,.06), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(185,121,26,.05), transparent 55%),
     var(--bg);
   color:var(--text);
   font-family:var(--display);
@@ -145,6 +145,27 @@ td input:focus{background:var(--bg);border-color:var(--accent-dim);}
   display:grid;place-items:center;
 }
 .icon-btn:hover{border-color:var(--danger);color:var(--danger);}
+tbody tr.is-default{background:rgba(185,121,26,.08);}
+tbody tr.is-default td:first-child{box-shadow:inset 3px 0 0 var(--accent-2);}
+.tpl-list li.is-default{border-color:var(--accent-2);}
+.badge-default{
+  font-family:var(--mono);font-size:10px;color:var(--accent-2);
+  border:1px solid var(--accent-2);border-radius:20px;padding:1px 8px;
+  margin-left:8px;white-space:nowrap;
+}
+.link-btn{
+  font-family:var(--display);font-size:12px;font-weight:600;
+  background:none;border:none;color:var(--text-dim);
+  padding:2px 0;cursor:pointer;text-align:left;
+  align-self:flex-start;margin-top:-6px;
+}
+.link-btn:hover{color:var(--accent-dim);}
+.link-btn.active{color:var(--accent-2);}
+.link-btn:disabled{color:var(--text-faint);cursor:default;}
+.preset-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:-4px;flex-wrap:wrap;}
+.preset-actions .link-btn{margin-top:0;}
+.preset-actions + label{margin-top:10px;padding-top:16px;border-top:1px dashed var(--border-soft);}
+.api-hint{margin-top:20px;}
 
 /* ===== QR TAB ===== */
 .qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
@@ -157,6 +178,7 @@ td input:focus{background:var(--bg);border-color:var(--accent-dim);}
   border-radius:20px;padding:5px 12px;cursor:pointer;
 }
 .preset-chip:hover{border-color:var(--accent-dim);color:var(--text);}
+.preset-chip.active{border-color:var(--accent-2);color:var(--accent-2);}
 
 .qr-result-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;}
 

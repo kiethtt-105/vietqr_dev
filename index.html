@@ -71,12 +71,12 @@
 
   <!-- ===== TABS ===== -->
   <nav class="tabs">
-    <button class="tab active" data-tab="list">Danh sách tài khoản</button>
-    <button class="tab" data-tab="qr">Tạo mã QR</button>
+    <button class="tab" data-tab="list">Danh sách tài khoản</button>
+    <button class="tab active" data-tab="qr">Tạo mã QR</button>
   </nav>
 
   <!-- ===== TAB: LIST ===== -->
-  <section class="panel" id="tab-list">
+  <section class="panel" id="tab-list" hidden>
     <div class="panel-head">
       <h2>Danh sách tài khoản</h2>
       <div class="panel-head-actions">
@@ -100,12 +100,13 @@
         <tbody id="bankTableBody"></tbody>
       </table>
     </div>
-    <p class="hint">Chọn ngân hàng từ danh sách gốc VietQR để tự điền mã/BIN/logo — giống cách m dùng VLOOKUP trong Excel trước đây.
+    <p class="hint">Chọn ngân hàng từ danh sách gốc VietQR để tự điền mã/BIN/logo.
+      Muốn đặt tài khoản mặc định thì sang tab <strong>Tạo mã QR</strong>.
       Sửa xong bấm <strong>Lưu lên GitHub</strong> để ghi lại <span class="mono">data/my-accounts.json</span>.</p>
   </section>
 
   <!-- ===== TAB: QR ===== -->
-  <section class="panel" id="tab-qr" hidden>
+  <section class="panel" id="tab-qr">
     <div class="qr-layout">
 
       <form class="qr-form" id="qrForm">
@@ -113,6 +114,7 @@
           <span>Tài khoản nhận</span>
           <select id="qrAccount"></select>
         </label>
+        <button type="button" class="link-btn" id="btnSetDefaultAccount">☆ Đặt làm mặc định</button>
 
         <label>
           <span>Số tiền (đ)</span>
@@ -125,7 +127,10 @@
         </label>
 
         <div class="presets" id="presetRow"></div>
-        <button class="btn subtle small" type="button" id="btnManageTemplates">Quản lý mẫu nội dung</button>
+        <div class="preset-actions">
+          <button type="button" class="link-btn" id="btnSetDefaultTemplate">☆ Đặt mẫu đang chọn làm mặc định</button>
+          <button class="link-btn" type="button" id="btnManageTemplates">Quản lý mẫu nội dung</button>
+        </div>
 
         <label>
           <span>Mẫu hiển thị QR</span>
@@ -169,11 +174,16 @@
         </div>
         <div class="qr-actions" id="qrActions" hidden>
           <button class="btn subtle" id="btnCopyLink" type="button">Sao chép link ảnh</button>
+          <button class="btn subtle" id="btnCopyApiLink" type="button">Sao chép link API</button>
           <a class="btn primary" id="btnDownload" download="qr-thanh-toan.png">Tải ảnh QR</a>
         </div>
       </div>
 
     </div>
+
+    <p class="hint api-hint">Gọi trực tiếp bằng link: <span class="mono">?bank=VCB&amp;stk=1031451081&amp;amount=100000&amp;content=...</span> —
+      thêm <span class="mono">&amp;redirect=1</span> để trả thẳng về ảnh QR, hoặc <span class="mono">&amp;format=text</span> để trang chỉ in ra link ảnh.
+      Nút <strong>Sao chép link API</strong> ở trên tự tạo link này theo đúng tài khoản/nội dung đang xem.</p>
 
     <div class="tpl-panel" id="tplPanel" hidden>
       <div class="tpl-add">
