@@ -1,0 +1,86 @@
+[
+  {
+    "data__id": 43,
+    "list_name": "Vietcombank",
+    "data_num": "1031451081",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "Vietcombank",
+    "data__code": "VCB",
+    "data__bin": "970436",
+    "data__shortName": "Vietcombank",
+    "data__logo": "https://cdn.vietqr.io/img/VCB.png",
+    "data__short_name": "Vietcombank"
+  },
+  {
+    "data__id": 38,
+    "list_name": "Techcombank",
+    "data_num": "44699999999",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "Techcombank",
+    "data__code": "TCB",
+    "data__bin": "970407",
+    "data__shortName": "Techcombank",
+    "data__logo": "https://cdn.vietqr.io/img/TCB.png",
+    "data__short_name": "Techcombank"
+  },
+  {
+    "data__id": 45,
+    "list_name": "VIB",
+    "data_num": "064933000",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "VIB",
+    "data__code": "VIB",
+    "data__bin": "970441",
+    "data__shortName": "VIB",
+    "data__logo": "https://cdn.vietqr.io/img/VIB.png",
+    "data__short_name": "VIB"
+  },
+  {
+    "data__id": 21,
+    "list_name": "Viettel Money",
+    "data_num": "9704229201938102578",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "MBBank",
+    "data__code": "MB",
+    "data__bin": "970422",
+    "data__shortName": "MBBank",
+    "data__logo": "https://cdn.vietqr.io/img/MB.png",
+    "data__short_name": "MBBank"
+  },
+  {
+    "data__id": 21,
+    "list_name": "MB",
+    "data_num": "4610052004",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "MBBank",
+    "data__code": "MB",
+    "data__bin": "970422",
+    "data__shortName": "MBBank",
+    "data__logo": "https://cdn.vietqr.io/img/MB.png",
+    "data__short_name": "MBBank"
+  },
+  {
+    "data__id": 38,
+    "list_name": "iPA",
+    "data_num": "MS00T095486917713297",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "Techcombank",
+    "data__code": "TCB",
+    "data__bin": "970407",
+    "data__shortName": "Techcombank",
+    "data__logo": "https://cdn.vietqr.io/img/TCB.png",
+    "data__short_name": "Techcombank"
+  },
+  {
+    "data__id": 17,
+    "list_name": "PhanLe Duy Khoi",
+    "data_num": "105878043349",
+    "name_ac": "Phan Le Duy Khoi",
+    "data__name": "VietinBank",
+    "data__code": "ICB",
+    "data__bin": "970415",
+    "data__shortName": "VietinBank",
+    "data__logo": "https://cdn.vietqr.io/img/ICB.png",
+    "data__short_name": "VietinBank"
+  }
+]
