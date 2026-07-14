@@ -1,27 +1,40 @@
 // ============================================================
 // SỔ QUỸ — Trình tạo mã QR VietQR (chạy tĩnh trên GitHub Pages)
-// 3 nguồn dữ liệu:
+// 2 nguồn dữ liệu:
 //   data/vietqr-banks.json  -> danh sách gốc VietQR (tham chiếu, read-only)
+//                              nếu chưa có file này / load lỗi -> tự lấy thẳng từ API VietQR
 //   data/my-accounts.json   -> tài khoản cá nhân (CRUD, đồng bộ GitHub)
-//   data/templates.json     -> mẫu nội dung chuyển khoản (CRUD, đồng bộ GitHub)
-// + Link API dạng ?bank=&stk=&amount=&content=&template=&name=&redirect=1|&format=text
-//   dùng cho iPhone Shortcuts / gọi trực tiếp, giống pattern pos-charge của dự án MoMo.
+// Mẫu hiển thị QR (compact2/compact/print/qr_only) là dữ liệu tĩnh khai báo
+// ngay trong file này (QR_DISPLAY_TEMPLATES), không cần file riêng.
+//
+// Link API — 3 kiểu gọi:
+//   1) ?amount=..&addInfo=..                -> dùng tài khoản MẶC ĐỊNH, trả thẳng ảnh QR
+//   2) ?bank=<tên gợi nhớ>&amount=..&addInfo=.. -> tìm tài khoản theo "tên gợi nhớ" (list_name)
+//   3) ?bank=<mã NH>&stk=<số TK>&amount=..&content=..&redirect=1 -> kiểu cũ, chỉ định thẳng
+//   (addInfo và content là 2 tên tương đương cho nội dung chuyển khoản)
+//   Thêm &format=text để trang chỉ in ra link ảnh thay vì chuyển thẳng tới ảnh.
 // ============================================================
 
 const LS_GH_CONFIG = "vietqr_gh_config";
 const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
-const LS_TEMPLATES_CACHE = "vietqr_templates_cache";
 const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
 
+// Mẫu hiển thị QR — khai báo dạng dữ liệu (JSON-like), muốn thêm mẫu mới chỉ cần thêm dòng ở đây
+const QR_DISPLAY_TEMPLATES = [
+  { value: "compact2", label: "Compact 2" },
+  { value: "compact", label: "Compact" },
+  { value: "print", label: "Print" },
+  { value: "qr_only", label: "Chỉ mã QR" },
+];
+
 let state = {
   refBanks: [],
   accounts: [],
-  templates: [],
-  sha: { accounts: null, templates: null },
-  gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json", pathTemplates: "data/templates.json" },
+  sha: { accounts: null },
+  gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json" },
 };
 
 // ---------- utils ----------
@@ -64,6 +77,13 @@ function restartAnimation(el) {
   void el.offsetWidth;
   el.style.animation = "";
 }
+function debounce(fn, ms) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
 
 // ---------- GitHub config persistence ----------
 function loadGhConfigFromStorage() {
@@ -75,7 +95,6 @@ function loadGhConfigFromStorage() {
   $("#ghRepo").value = state.gh.repo || "";
   $("#ghBranch").value = state.gh.branch || "main";
   $("#ghPathAccounts").value = state.gh.pathAccounts || "data/my-accounts.json";
-  $("#ghPathTemplates").value = state.gh.pathTemplates || "data/templates.json";
   $("#ghToken").value = localStorage.getItem(LS_GH_TOKEN) || "";
   updateGhStatusLabel();
 }
@@ -84,7 +103,6 @@ function saveGhConfigToStorage() {
   state.gh.repo = $("#ghRepo").value.trim();
   state.gh.branch = $("#ghBranch").value.trim() || "main";
   state.gh.pathAccounts = $("#ghPathAccounts").value.trim() || "data/my-accounts.json";
-  state.gh.pathTemplates = $("#ghPathTemplates").value.trim() || "data/templates.json";
   localStorage.setItem(LS_GH_CONFIG, JSON.stringify(state.gh));
   const token = $("#ghToken").value.trim();
   if (token) localStorage.setItem(LS_GH_TOKEN, token);
@@ -98,6 +116,12 @@ function updateGhStatusLabel() {
   const ok = state.gh.owner && state.gh.repo && getToken();
   $("#ghDot").className = "dot" + (ok ? " on" : "");
   $("#ghStatusLabel").textContent = ok ? `${state.gh.owner}/${state.gh.repo}` : "Chưa kết nối GitHub";
+}
+function openGhModal() {
+  $("#ghBackdrop").hidden = false;
+}
+function closeGhModal() {
+  $("#ghBackdrop").hidden = true;
 }
 function ghApiUrl(path) {
   return `https://api.github.com/repos/${state.gh.owner}/${state.gh.repo}/contents/${path}`;
@@ -140,29 +164,15 @@ async function loadAllFromGithub() {
   }
   setStatus($("#ghMsg"), "Đang tải từ GitHub…");
   try {
-    const [acc, tpl] = await Promise.all([
-      ghReadJson(state.gh.pathAccounts),
-      ghReadJson(state.gh.pathTemplates),
-    ]);
+    const acc = await ghReadJson(state.gh.pathAccounts);
     if (acc.data) {
       state.accounts = acc.data;
       state.sha.accounts = acc.sha;
       localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(acc.data));
     }
-    if (tpl.data) {
-      state.templates = tpl.data;
-      state.sha.templates = tpl.sha;
-      localStorage.setItem(LS_TEMPLATES_CACHE, JSON.stringify(tpl.data));
-    }
     renderTable();
-    renderTemplateList();
-    renderPresets();
     populateQrAccounts();
-    setStatus(
-      $("#ghMsg"),
-      `Đã tải ${state.accounts.length} tài khoản, ${state.templates.length} mẫu nội dung.`,
-      "ok"
-    );
+    setStatus($("#ghMsg"), `Đã tải ${state.accounts.length} tài khoản.`, "ok");
     $("#ghDot").className = "dot on";
   } catch (err) {
     console.error(err);
@@ -174,7 +184,7 @@ async function loadAllFromGithub() {
 async function saveAccountsToGithub() {
   if (!state.gh.owner || !state.gh.repo) {
     setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở panel kết nối phía trên.", "err");
-    $("#ghPanel").hidden = false;
+    openGhModal();
     return;
   }
   setStatus($("#ghMsg"), "Đang lưu tài khoản lên GitHub…");
@@ -189,38 +199,44 @@ async function saveAccountsToGithub() {
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    $("#ghPanel").hidden = false;
-  }
-}
-
-async function saveTemplatesToGithub() {
-  const el = $("#tplMsg");
-  if (!state.gh.owner || !state.gh.repo || !getToken()) {
-    setStatus(el, "Chưa cấu hình GitHub / token — mở panel kết nối ở đầu trang.", "err");
-    $("#ghPanel").hidden = false;
-    return;
-  }
-  setStatus(el, "Đang lưu mẫu lên GitHub…");
-  try {
-    state.sha.templates = await ghWriteJson(
-      state.gh.pathTemplates,
-      state.templates,
-      state.sha.templates,
-      `chore: cập nhật templates.json (${new Date().toISOString()})`
-    );
-    setStatus(el, "Đã lưu mẫu nội dung lên GitHub ✓", "ok");
-  } catch (err) {
-    console.error(err);
-    setStatus(el, "Lỗi khi lưu: " + err.message, "err");
+    openGhModal();
   }
 }
 
 // ---------- Reference bank list (vietqr-banks.json) ----------
+function mapVietQrApiBanks(payload) {
+  if (!payload || !Array.isArray(payload.data)) return [];
+  return payload.data.map((b) => ({
+    id: b.id,
+    name: b.name,
+    code: b.code,
+    bin: b.bin,
+    shortName: b.shortName,
+    logo: b.logo,
+    short_name: b.short_name,
+  }));
+}
 async function loadRefBanks() {
+  // Ưu tiên file cục bộ trong repo, nếu chưa có / lỗi thì lấy thẳng từ API VietQR
+  // (đây là nguyên nhân chính khiến "+ Thêm dòng" trước đó như không hoạt động:
+  //  dropdown ngân hàng bị rỗng vì data/vietqr-banks.json chưa tồn tại)
   try {
     const res = await fetch("data/vietqr-banks.json");
-    state.refBanks = await res.json();
+    if (!res.ok) throw new Error("no local file");
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      state.refBanks = data;
+      return;
+    }
+    throw new Error("empty local file");
   } catch (e) {
+    /* rơi xuống lấy từ API */
+  }
+  try {
+    const res = await fetch(VIETQR_BANKS_API);
+    const payload = await res.json();
+    state.refBanks = mapVietQrApiBanks(payload);
+  } catch (e2) {
     state.refBanks = [];
   }
 }
@@ -232,21 +248,14 @@ async function refreshRefBanksFromVietQR() {
   try {
     const res = await fetch(VIETQR_BANKS_API);
     const payload = await res.json();
-    if (!payload.data) throw new Error("Không đọc được dữ liệu từ VietQR");
-    state.refBanks = payload.data.map((b) => ({
-      id: b.id,
-      name: b.name,
-      code: b.code,
-      bin: b.bin,
-      shortName: b.shortName,
-      logo: b.logo,
-      short_name: b.short_name,
-    }));
+    const banks = mapVietQrApiBanks(payload);
+    if (!banks.length) throw new Error("Không đọc được dữ liệu từ VietQR");
+    state.refBanks = banks;
     renderTable();
     btn.textContent = `Đã cập nhật ${state.refBanks.length} ngân hàng ✓`;
   } catch (err) {
     console.error(err);
-    btn.textContent = "Lỗi tải — dùng bản có sẵn";
+    btn.textContent = "Lỗi tải — thử lại sau";
   } finally {
     setTimeout(() => {
       btn.textContent = original;
@@ -283,6 +292,18 @@ async function loadAccountsInitial() {
     state.accounts = [];
   }
 }
+// Dùng cho đường API nhanh (redirect thẳng): chỉ đọc cache / fetch nhẹ, không đụng DOM
+async function ensureAccountsLoaded() {
+  if (state.accounts.length) return;
+  loadAccountsCache();
+  if (state.accounts.length) return;
+  try {
+    const res = await fetch("data/my-accounts.json");
+    if (res.ok) state.accounts = await res.json();
+  } catch (e) {
+    state.accounts = [];
+  }
+}
 function applyBankToRow(idx, bankCode) {
   const bank = state.refBanks.find((b) => b.code === bankCode);
   if (!bank) return;
@@ -312,6 +333,9 @@ function renderTable() {
     body.appendChild(tr);
   });
   $("#rowCount").textContent = `${state.accounts.length} dòng`;
+  if (!state.refBanks.length) {
+    setStatus($("#ghMsg"), "Chưa có danh sách ngân hàng — bấm \"Làm mới ngân hàng từ VietQR\".", "err");
+  }
 
   body.querySelectorAll("input").forEach((input) => {
     input.addEventListener("input", (e) => {
@@ -340,7 +364,17 @@ function renderTable() {
     });
   });
 }
-function addRow() {
+async function addRow() {
+  const btn = $("#btnAddRow");
+  // Nếu chưa có danh sách ngân hàng thì tự tải trước, tránh dòng mới bị kẹt "không có ngân hàng để chọn"
+  if (!state.refBanks.length) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Đang tải ngân hàng…";
+    await refreshRefBanksFromVietQR();
+    btn.disabled = false;
+    btn.textContent = original;
+  }
   const defaultBank = state.refBanks[0] || {};
   state.accounts.push({
     data__id: defaultBank.id || 0,
@@ -358,71 +392,14 @@ function addRow() {
   populateQrAccounts();
 }
 
-// ---------- Templates CRUD ----------
-function loadTemplatesCache() {
-  const cached = localStorage.getItem(LS_TEMPLATES_CACHE);
-  if (cached) {
-    try {
-      state.templates = JSON.parse(cached);
-      return;
-    } catch (e) {}
-  }
-}
-async function loadTemplatesInitial() {
-  loadTemplatesCache();
-  if (state.templates.length) return;
-  try {
-    const res = await fetch("data/templates.json");
-    state.templates = await res.json();
-  } catch (e) {
-    state.templates = [];
-  }
-}
-function renderPresets() {
-  const row = $("#presetRow");
-  row.innerHTML = state.templates
-    .map((t) => `<button type="button" class="preset-chip">${escapeHtml(t.label)}</button>`)
-    .join("");
-  row.querySelectorAll(".preset-chip").forEach((chip, i) => {
-    chip.addEventListener("click", () => {
-      $("#qrContent").value = state.templates[i].content;
-    });
-  });
-}
-function renderTemplateList() {
-  const ul = $("#tplList");
-  ul.innerHTML = state.templates
-    .map(
-      (t, i) =>
-        `<li><div><div>${escapeHtml(t.label)}</div><span class="tpl-content">${escapeHtml(t.content)}</span></div>
-         <button class="icon-btn" data-tpldel="${i}" title="Xoá mẫu">✕</button></li>`
-    )
-    .join("");
-  ul.querySelectorAll("[data-tpldel]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const i = Number(e.target.dataset.tpldel);
-      state.templates.splice(i, 1);
-      localStorage.setItem(LS_TEMPLATES_CACHE, JSON.stringify(state.templates));
-      renderTemplateList();
-      renderPresets();
-    });
-  });
-}
-function addTemplate() {
-  const label = $("#tplLabelInput").value.trim();
-  const content = $("#tplContentInput").value.trim();
-  if (!label || !content) return;
-  state.templates.push({ label, content });
-  localStorage.setItem(LS_TEMPLATES_CACHE, JSON.stringify(state.templates));
-  $("#tplLabelInput").value = "";
-  $("#tplContentInput").value = "";
-  renderTemplateList();
-  renderPresets();
-}
-
-// ---------- Mặc định: tài khoản + mẫu QR (chung cho mọi tài khoản) ----------
+// ---------- Mặc định: tài khoản + mẫu hiển thị QR ----------
 function accountKey(acc) {
   return `${acc.list_name}|${acc.data_num}`;
+}
+function findAccountByNickname(nick) {
+  if (!nick) return null;
+  const n = String(nick).trim().toLowerCase();
+  return state.accounts.find((a) => (a.list_name || "").trim().toLowerCase() === n) || null;
 }
 function loadDefaults() {
   try {
@@ -448,12 +425,6 @@ function setDefaultAccount() {
   localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
   flashLinkBtn("#btnSetDefaultAccount", "★ Đã đặt mặc định");
 }
-function setDefaultTemplate() {
-  const defaults = loadDefaults();
-  defaults.template = $("#qrTemplate").value;
-  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
-  flashLinkBtn("#btnSetDefaultTemplate", "★ Đã đặt mặc định");
-}
 function flashLinkBtn(sel, text) {
   const btn = $(sel);
   const original = btn.textContent;
@@ -462,6 +433,12 @@ function flashLinkBtn(sel, text) {
 }
 
 // ---------- QR tab ----------
+function populateQrTemplateOptions() {
+  const sel = $("#qrTemplate");
+  const prev = sel.value;
+  sel.innerHTML = QR_DISPLAY_TEMPLATES.map((t) => `<option value="${t.value}">${escapeHtml(t.label)}</option>`).join("");
+  if (prev) sel.value = prev;
+}
 function populateQrAccounts() {
   const sel = $("#qrAccount");
   const prev = sel.value;
@@ -487,12 +464,13 @@ function buildQrUrlRaw(bankCode, accNum, amount, content, template, accountName)
 function buildQrUrl(acc, amount, content, template) {
   return buildQrUrlRaw(acc.data__code, acc.data_num, amount, content, template, acc.name_ac);
 }
-function onGenerateQr(e) {
+function onGenerateQr(e, opts) {
   if (e) e.preventDefault();
+  const silent = opts && opts.silent;
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
   if (!acc) {
-    alert("Chưa có tài khoản nào — thêm ở tab Danh sách tài khoản trước.");
+    if (!silent) alert("Chưa có tài khoản nào — thêm ở tab Danh sách tài khoản trước.");
     return;
   }
   const amount = rawNumber($("#qrAmount").value);
@@ -524,43 +502,87 @@ function onGenerateQr(e) {
   $("#btnCopyApiLink").dataset.url = apiUrl;
 
   restartAnimation($("#qrCard"));
-  restartAnimation($("#qrStamp"));
 }
 
-// ---------- Link API: ?bank=&stk=&amount=&content=&template=&name=&redirect=1|format=text ----------
-function handleApiParams() {
+// ---------- Link API ----------
+// resolveApiAccount quyết định dùng tài khoản nào dựa trên tham số URL:
+//  - bank + stk (đủ cả 2)      -> dùng thẳng như cũ, không tự redirect trừ khi có &redirect=1
+//  - bank (là tên gợi nhớ, không có stk) -> tra trong danh sách tài khoản theo list_name, tự redirect
+//  - không có bank/stk         -> dùng tài khoản mặc định (hoặc tài khoản đầu tiên), tự redirect
+function resolveApiAccount(params) {
+  const bankParam = (params.get("bank") || "").trim();
+  const stkParam = (params.get("stk") || "").trim();
+
+  if (bankParam && stkParam) {
+    const idx = state.accounts.findIndex((a) => a.data__code === bankParam && a.data_num === stkParam);
+    const acc = idx >= 0 ? state.accounts[idx] : null;
+    return {
+      bank: bankParam,
+      stk: stkParam,
+      name: params.get("name") || (acc ? acc.name_ac : ""),
+      idx,
+      auto: false,
+    };
+  }
+
+  if (bankParam && !stkParam) {
+    const acc = findAccountByNickname(bankParam);
+    if (acc) {
+      return { bank: acc.data__code, stk: acc.data_num, name: acc.name_ac, idx: state.accounts.indexOf(acc), auto: true };
+    }
+  }
+
+  const defaults = loadDefaults();
+  let acc = null;
+  if (defaults.accountKey) {
+    acc = state.accounts.find((a) => accountKey(a) === defaults.accountKey) || null;
+  }
+  if (!acc) acc = state.accounts[0] || null;
+  if (!acc) return null;
+  return { bank: acc.data__code, stk: acc.data_num, name: acc.name_ac, idx: state.accounts.indexOf(acc), auto: true };
+}
+
+async function handleApiParams() {
   const params = new URLSearchParams(window.location.search);
-  const bank = params.get("bank");
-  const stk = params.get("stk");
-  if (!bank || !stk) return false;
+  const hasApiIntent =
+    params.has("bank") || params.has("stk") || params.has("amount") || params.has("content") || params.has("addInfo");
+  if (!hasApiIntent) return false;
+
+  await ensureAccountsLoaded();
+
+  const resolved = resolveApiAccount(params);
+  if (!resolved) return false; // chưa có tài khoản nào -> mở app bình thường để thêm tài khoản trước
 
   const amount = rawNumber(params.get("amount") || "");
-  const content = params.get("content") || "";
+  const content = params.get("content") || params.get("addInfo") || "";
   const template = params.get("template") || loadDefaults().template || "compact2";
-  const name = params.get("name") || "";
-  const url = buildQrUrlRaw(bank, stk, amount, content, template, name);
+  const url = buildQrUrlRaw(resolved.bank, resolved.stk, amount, content, template, resolved.name);
 
-  if (params.get("redirect") === "1") {
-    window.location.replace(url);
-    return true;
-  }
-  if (params.get("format") === "text") {
+  const wantsText = params.get("format") === "text";
+  const wantsRedirect = params.get("redirect") === "1" || (resolved.auto && params.get("redirect") !== "0");
+
+  if (wantsText) {
     document.documentElement.innerHTML = "";
     document.body = document.createElement("body");
-    document.body.style.cssText = "margin:0;padding:16px;font-family:monospace;font-size:13px;background:#fff;color:#000;word-break:break-all;";
+    document.body.style.cssText =
+      "margin:0;padding:16px;font-family:monospace;font-size:13px;background:#fff;color:#000;word-break:break-all;";
     document.body.textContent = url;
     document.title = "VietQR link";
     return true;
   }
+  if (wantsRedirect) {
+    window.location.replace(url);
+    return true;
+  }
 
   // Không redirect/text -> điền sẵn vào form bình thường sau khi init xong
-  window.__apiPrefill = { bank, stk, amount, content, template, name };
+  window.__apiPrefill = { bank: resolved.bank, stk: resolved.stk, amount, content, template, name: resolved.name, idx: resolved.idx };
   return false;
 }
 function applyApiPrefill() {
   const p = window.__apiPrefill;
   if (!p) return;
-  let idx = state.accounts.findIndex((a) => a.data__code === p.bank && a.data_num === p.stk);
+  let idx = p.idx != null && p.idx >= 0 ? p.idx : state.accounts.findIndex((a) => a.data__code === p.bank && a.data_num === p.stk);
   if (idx < 0) {
     state.accounts.push({
       data__id: 0,
@@ -599,7 +621,7 @@ function initTabs() {
 
 // ---------- Init ----------
 async function init() {
-  const handled = handleApiParams();
+  const handled = await handleApiParams();
   if (handled) return; // đã redirect hoặc in ra text, không cần dựng UI
 
   initTabs();
@@ -607,15 +629,25 @@ async function init() {
 
   await loadRefBanks();
   await loadAccountsInitial();
-  await loadTemplatesInitial();
 
   renderTable();
-  renderTemplateList();
-  renderPresets();
+  populateQrTemplateOptions();
   populateQrAccounts();
 
-  $("#btnToggleGithub").addEventListener("click", () => {
-    $("#ghPanel").hidden = !$("#ghPanel").hidden;
+  $("#btnToggleGithub").addEventListener("click", openGhModal);
+  $("#btnGhClose").addEventListener("click", closeGhModal);
+  $("#ghBackdrop").addEventListener("click", (e) => {
+    if (e.target.id === "ghBackdrop") closeGhModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("#ghBackdrop").hidden) closeGhModal();
+  });
+  $("#btnToggleTokenVisibility").addEventListener("click", () => {
+    const input = $("#ghToken");
+    const btn = $("#btnToggleTokenVisibility");
+    const showing = input.type === "text";
+    input.type = showing ? "password" : "text";
+    btn.textContent = showing ? "👁" : "🙈";
   });
   $("#btnGhSave").addEventListener("click", saveGhConfigToStorage);
   $("#btnGhLoad").addEventListener("click", loadAllFromGithub);
@@ -633,19 +665,18 @@ async function init() {
     await saveAccountsToGithub();
   });
 
-  $("#btnManageTemplates").addEventListener("click", () => {
-    $("#tplPanel").hidden = !$("#tplPanel").hidden;
-  });
-  $("#btnAddTemplate").addEventListener("click", addTemplate);
-  $("#btnSaveTemplates").addEventListener("click", saveTemplatesToGithub);
-
   $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
-  $("#btnSetDefaultTemplate").addEventListener("click", setDefaultTemplate);
 
-  $("#qrForm").addEventListener("submit", onGenerateQr);
+  $("#qrForm").addEventListener("submit", (e) => onGenerateQr(e));
   $("#qrAmount").addEventListener("input", (e) => {
     e.target.value = formatNumber(e.target.value);
   });
+
+  const liveGenerate = debounce(() => onGenerateQr(null, { silent: true }), 350);
+  $("#qrAccount").addEventListener("change", () => onGenerateQr(null, { silent: true }));
+  $("#qrTemplate").addEventListener("change", () => onGenerateQr(null, { silent: true }));
+  $("#qrAmount").addEventListener("input", liveGenerate);
+  $("#qrContent").addEventListener("input", liveGenerate);
   $("#btnCopyLink").addEventListener("click", async (e) => {
     const url = e.target.dataset.url;
     if (!url) return;
@@ -665,7 +696,11 @@ async function init() {
   });
 
   applyDefaults();
-  applyApiPrefill();
+  if (window.__apiPrefill) {
+    applyApiPrefill();
+  } else {
+    onGenerateQr(null, { silent: true });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", init);
