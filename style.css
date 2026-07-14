@@ -171,10 +171,15 @@ input::placeholder{color:var(--ink-faint);}
 .details-toggle summary{
   cursor:pointer;font-size:11px;color:var(--ink-faint);
   list-style:none;user-select:none;
+  display:flex;align-items:center;gap:5px;
 }
 .details-toggle summary::-webkit-details-marker{display:none;}
-.details-toggle summary::before{content:"▸ ";}
-.details-toggle[open] summary::before{content:"▾ ";}
+.details-toggle summary::before{
+  content:"▸";display:inline-block;
+  transition:transform .18s ease;
+  transform-origin:center;
+}
+.details-toggle[open] summary::before{transform:rotate(90deg);}
 .details-toggle summary:hover{color:var(--ink-dim);}
 .details-toggle .hint{margin-top:8px;}
 
