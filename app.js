@@ -717,12 +717,30 @@ function closeSettingsModal() {
   $("#settingsBackdrop").hidden = true;
 }
 
+// ---------- Ripple effect (hiệu ứng khi bấm chuột) ----------
+function initRippleEffect() {
+  document.addEventListener("click", (e) => {
+    const target = e.target.closest(".btn, .icon-btn");
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 1.5;
+    const ripple = document.createElement("span");
+    ripple.className = "ripple";
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+    ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+    target.appendChild(ripple);
+    ripple.addEventListener("animationend", () => ripple.remove());
+  });
+}
+
 // ---------- Init ----------
 async function init() {
   const handled = await handleApiParams();
   if (handled) return; // đã redirect hoặc in ra text, không cần dựng UI
 
   loadGhConfigFromStorage();
+  initRippleEffect();
 
   await loadRefBanks();
   await loadAccountsInitial();
