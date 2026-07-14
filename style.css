@@ -76,6 +76,8 @@ body{
 .btn:active{transform:scale(.97);}
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);}
+.btn.danger{background:var(--danger);color:#fff;border-color:var(--danger);}
+.btn.danger:hover{background:#d8483f;border-color:#d8483f;}
 .btn.subtle{background:var(--panel-2);}
 .btn.full{width:100%;justify-content:center;padding:11px;font-size:13.5px;}
 .btn:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible{
@@ -99,6 +101,7 @@ body{
   display:flex;align-items:center;justify-content:center;
   padding:20px;
 }
+#confirmBackdrop{z-index:80;} /* luôn nổi trên các modal khác (vd: bảng danh sách tài khoản) */
 .modal-backdrop[hidden]{display:none !important;}
 .gh-panel{
   width:100%;max-width:580px;max-height:82vh;overflow-y:auto;
@@ -106,6 +109,10 @@ body{
   border-radius:11px;padding:18px 20px 20px;
 }
 .gh-panel.settings-panel{max-width:900px;}
+.confirm-panel{max-width:340px;text-align:center;padding:22px 22px 20px;}
+.confirm-message{margin:0 0 16px;font-size:13.5px;color:var(--ink);line-height:1.5;}
+.confirm-actions{margin-top:0;justify-content:center;}
+.confirm-actions .btn{flex:1;justify-content:center;max-width:130px;}
 .gh-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .gh-panel-head h2{font-size:14.5px;margin:0;font-weight:700;}
 .gh-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}

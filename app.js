@@ -47,6 +47,43 @@ let state = {
   gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json" },
 };
 
+// ---------- Custom confirm dialog (thay window.confirm mặc định) ----------
+function showConfirm(message, okLabel) {
+  return new Promise((resolve) => {
+    const backdrop = $("#confirmBackdrop");
+    const okBtn = $("#confirmOkBtn");
+    const cancelBtn = $("#confirmCancelBtn");
+    $("#confirmMessage").textContent = message;
+    okBtn.textContent = okLabel || "Xoá";
+    backdrop.hidden = false;
+
+    function cleanup(result) {
+      backdrop.hidden = true;
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      backdrop.removeEventListener("click", onBackdropClick);
+      document.removeEventListener("keydown", onKeydown);
+      resolve(result);
+    }
+    function onOk() {
+      cleanup(true);
+    }
+    function onCancel() {
+      cleanup(false);
+    }
+    function onBackdropClick(e) {
+      if (e.target.id === "confirmBackdrop") cleanup(false);
+    }
+    function onKeydown(e) {
+      if (e.key === "Escape") cleanup(false);
+    }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    backdrop.addEventListener("click", onBackdropClick);
+    document.addEventListener("keydown", onKeydown);
+  });
+}
+
 // ---------- utils ----------
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -422,9 +459,10 @@ function renderTable() {
     });
   });
   body.querySelectorAll("[data-del]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const idx = Number(e.target.dataset.del);
-      if (confirm(`Xoá dòng "${state.accounts[idx].list_name}"?`)) {
+      const ok = await showConfirm(`Xoá dòng "${state.accounts[idx].list_name}"?`);
+      if (ok) {
         state.accounts.splice(idx, 1);
         renderTable();
         populateQrAccounts();
@@ -708,6 +746,7 @@ async function init() {
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
+    if (!$("#confirmBackdrop").hidden) return; // để confirm dialog tự xử lý Escape của riêng nó
     if (!$("#ghBackdrop").hidden) closeGhModal();
     if (!$("#settingsBackdrop").hidden) closeSettingsModal();
   });

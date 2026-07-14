@@ -89,6 +89,17 @@
     </section>
   </div>
 
+  <!-- ===== CONFIRM DIALOG (thay window.confirm mặc định) ===== -->
+  <div class="modal-backdrop" id="confirmBackdrop" hidden>
+    <section class="gh-panel confirm-panel" role="alertdialog" aria-modal="true" aria-label="Xác nhận">
+      <p class="confirm-message" id="confirmMessage">Bạn có chắc chắn?</p>
+      <div class="gh-actions confirm-actions">
+        <button class="btn subtle" id="confirmCancelBtn" type="button">Huỷ</button>
+        <button class="btn danger" id="confirmOkBtn" type="button">Xoá</button>
+      </div>
+    </section>
+  </div>
+
   <!-- ===== SETTINGS MODAL: DANH SÁCH TÀI KHOẢN ===== -->
   <div class="modal-backdrop" id="settingsBackdrop" hidden>
     <section class="gh-panel settings-panel" id="settingsPanel" role="dialog" aria-label="Danh sách tài khoản">
@@ -173,17 +184,6 @@
 
     </div>
 
-    <!-- Cú pháp gọi API tự động hoá (Shortcuts, script...), gấp lại mặc định cho gọn giao diện -->
-    <details class="details-toggle">
-      <summary>Cú pháp gọi qua link API</summary>
-      <p class="hint">
-        <span class="mono">?amount=100000&amp;addInfo=...</span> — dùng luôn tài khoản <strong>mặc định</strong>, trả thẳng ảnh QR.<br>
-        <span class="mono">?bank=&lt;tên gợi nhớ&gt;&amp;amount=100000&amp;addInfo=...</span> — chọn tài khoản theo tên gợi nhớ đã đặt ở tab Danh sách.<br>
-        <span class="mono">?bank=VCB&amp;stk=1031451081&amp;amount=100000&amp;content=...&amp;redirect=1</span> — kiểu cũ, chỉ định thẳng mã ngân hàng + số TK.<br>
-        Thêm <span class="mono">&amp;format=text</span> để trang chỉ in ra link ảnh thay vì chuyển thẳng.
-        Nút <strong>Sao chép link API</strong> ở trên tự tạo link theo tài khoản/nội dung đang xem.
-      </p>
-    </details>
   </section>
 
   </div><!-- /.pages -->
