@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sổ Quỹ · Tạo mã QR chuyển khoản</title>
+<title>VietQR Generator · Tạo mã QR chuyển khoản</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -17,15 +17,18 @@
     <div class="brand">
       <span class="brand-mark">◱</span>
       <div class="brand-text">
-        <h1>Sổ Quỹ</h1>
-        <p>Trình tạo mã QR chuyển khoản · VietQR</p>
+        <h1>VietQR Generator</h1>
+        <p>Tạo mã QR chuyển khoản ngân hàng</p>
       </div>
     </div>
 
-    <button class="btn ghost" id="btnToggleGithub" type="button">
-      <span class="dot" id="ghDot"></span>
-      <span id="ghStatusLabel">Chưa kết nối GitHub</span>
-    </button>
+    <div class="topbar-actions">
+      <button class="btn ghost icon-only" id="btnOpenSettings" type="button" title="Danh sách tài khoản" aria-label="Danh sách tài khoản">⚙</button>
+      <button class="btn ghost" id="btnToggleGithub" type="button">
+        <span class="dot" id="ghDot"></span>
+        <span id="ghStatusLabel">Chưa kết nối GitHub</span>
+      </button>
+    </div>
   </header>
 
   <!-- ===== NỘI DUNG ===== -->
@@ -47,22 +50,33 @@
           <span>Tên repo</span>
           <input id="ghRepo" type="text" placeholder="vd: vietqr-generator">
         </label>
-        <label>
-          <span>Branch</span>
-          <input id="ghBranch" type="text" placeholder="main" value="main">
-        </label>
-        <label>
-          <span>File tài khoản cá nhân</span>
-          <input id="ghPathAccounts" type="text" value="data/my-accounts.json">
-        </label>
         <label class="span2">
           <span>Personal Access Token (fine-grained, quyền Contents: Read & write)</span>
           <div class="input-with-action">
             <input id="ghToken" type="password" placeholder="github_pat_xxxxxxxxxxxx">
             <button class="icon-btn eye-btn" id="btnToggleTokenVisibility" type="button" aria-label="Hiện/ẩn token">👁</button>
           </div>
+          <div class="token-check-row">
+            <button class="btn subtle" id="btnGhCheck" type="button">Kiểm tra kết nối</button>
+            <span class="status inline" id="ghCheckMsg"></span>
+          </div>
         </label>
       </div>
+
+      <details class="details-toggle">
+        <summary>Tuỳ chọn nâng cao (branch, đường dẫn file)</summary>
+        <div class="gh-grid" style="margin-top:10px;">
+          <label>
+            <span>Branch</span>
+            <input id="ghBranch" type="text" placeholder="main" value="main">
+          </label>
+          <label>
+            <span>File tài khoản cá nhân</span>
+            <input id="ghPathAccounts" type="text" value="data/my-accounts.json">
+          </label>
+        </div>
+      </details>
+
       <div class="gh-actions">
         <button class="btn primary" id="btnGhSave" type="button">Lưu thông tin kết nối</button>
         <button class="btn" id="btnGhLoad" type="button">Tải tài khoản từ GitHub</button>
@@ -70,51 +84,50 @@
       </div>
       <p class="hint">Token chỉ lưu trong <code>localStorage</code> trên máy này, không commit lên repo. Tạo token tại
         <span class="mono">github.com → Settings → Developer settings → Fine-grained tokens</span>, cấp quyền
-        <strong>Contents: Read and write</strong> cho đúng repo này.
-        Danh sách ngân hàng gốc (<code>data/vietqr-banks.json</code>) chỉ để tra cứu, không cần đồng bộ — nếu chưa
-        có file này thì trang tự lấy trực tiếp từ VietQR, hoặc bấm nút <strong>làm mới từ VietQR</strong> bên dưới.</p>
+        <strong>Contents: Read and write</strong> cho đúng repo này.</p>
       <p class="status" id="ghMsg"></p>
     </section>
   </div>
 
-  <!-- ===== TABS ===== -->
-  <nav class="tabs">
-    <button class="tab" data-tab="list">Danh sách tài khoản</button>
-    <button class="tab active" data-tab="qr">Tạo mã QR</button>
-  </nav>
-
-  <!-- ===== TAB: LIST ===== -->
-  <section class="panel" id="tab-list" hidden>
-    <div class="panel-head">
-      <h2>Danh sách tài khoản</h2>
-      <div class="panel-head-actions">
-        <span class="count-badge" id="rowCount">0 dòng</span>
-        <button class="btn subtle" id="btnRefreshBanks" type="button">Làm mới ngân hàng từ VietQR</button>
-        <button class="btn subtle" id="btnAddRow" type="button">+ Thêm dòng</button>
-        <button class="btn primary" id="btnSaveGithub" type="button">Lưu lên GitHub</button>
+  <!-- ===== SETTINGS MODAL: DANH SÁCH TÀI KHOẢN ===== -->
+  <div class="modal-backdrop" id="settingsBackdrop" hidden>
+    <section class="gh-panel settings-panel" id="settingsPanel" role="dialog" aria-label="Danh sách tài khoản">
+      <div class="gh-panel-head">
+        <h2>Danh sách tài khoản</h2>
+        <button class="icon-btn" id="btnSettingsClose" type="button" aria-label="Đóng">✕</button>
       </div>
-    </div>
-    <div class="table-wrap">
-      <table id="bankTable">
-        <thead>
-          <tr>
-            <th>Tên gợi nhớ<br><span class="th-sub">list_name</span></th>
-            <th>Số tài khoản<br><span class="th-sub">data_num</span></th>
-            <th>Chủ tài khoản<br><span class="th-sub">name_ac</span></th>
-            <th style="width:230px">Ngân hàng<br><span class="th-sub">data__code / data__bin</span></th>
-            <th style="width:44px"></th>
-          </tr>
-        </thead>
-        <tbody id="bankTableBody"></tbody>
-      </table>
-    </div>
-    <p class="hint">Chọn ngân hàng từ danh sách gốc VietQR để tự điền mã/BIN/logo.
-      "Tên gợi nhớ" dùng để gọi tài khoản qua link API (vd: <span class="mono">?bank=Vi+tien+mat</span>).
-      Muốn đặt tài khoản mặc định thì sang tab <strong>Tạo mã QR</strong>.
-      Sửa xong bấm <strong>Lưu lên GitHub</strong> để ghi lại <span class="mono">data/my-accounts.json</span>.</p>
-  </section>
+      <div class="panel-head">
+        <span class="count-badge" id="rowCount">0 dòng</span>
+        <div class="panel-head-actions">
+          <button class="btn subtle" id="btnRefreshBanks" type="button">Làm mới ngân hàng từ VietQR</button>
+          <button class="btn subtle" id="btnAddRow" type="button">+ Thêm dòng</button>
+          <button class="btn primary" id="btnSaveGithub" type="button">Lưu lên GitHub</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="bankTable">
+          <thead>
+            <tr>
+              <th>Tên gợi nhớ<br><span class="th-sub">list_name</span></th>
+              <th>Số tài khoản<br><span class="th-sub">data_num</span></th>
+              <th>Chủ tài khoản<br><span class="th-sub">name_ac</span></th>
+              <th style="width:230px">Ngân hàng<br><span class="th-sub">data__code / data__bin</span></th>
+              <th style="width:44px"></th>
+            </tr>
+          </thead>
+          <tbody id="bankTableBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">Chọn ngân hàng từ danh sách gốc VietQR để tự điền mã/BIN/logo.
+        "Tên gợi nhớ" dùng để gọi tài khoản qua link API (vd: <span class="mono">?bank=Vi+tien+mat</span>).
+        Muốn đặt tài khoản mặc định thì đóng bảng này rồi dùng nút <strong>☆ Đặt làm mặc định</strong> ở form tạo QR.
+        Sửa xong bấm <strong>Lưu lên GitHub</strong> để ghi lại <span class="mono">data/my-accounts.json</span>.
+        Danh sách ngân hàng gốc (<code>data/vietqr-banks.json</code>) chỉ để tra cứu, không cần đồng bộ — nếu chưa
+        có file này thì trang tự lấy trực tiếp từ VietQR, hoặc bấm <strong>Làm mới ngân hàng từ VietQR</strong> ở trên.</p>
+    </section>
+  </div>
 
-  <!-- ===== TAB: QR ===== -->
+  <!-- ===== TẠO MÃ QR ===== -->
   <section class="panel" id="tab-qr">
     <div class="qr-layout">
 
@@ -145,26 +158,8 @@
 
       <div class="qr-result-wrap">
         <div class="qr-card" id="qrCard" hidden>
-          <div class="qr-card-chip"></div>
           <div class="qr-card-bank" id="qrCardBank">—</div>
           <img id="qrImage" alt="Mã QR chuyển khoản" />
-          <div class="qr-card-row">
-            <span class="label">Chủ TK</span>
-            <span class="value" id="qrCardName">—</span>
-          </div>
-          <div class="qr-card-row">
-            <span class="label">Số TK</span>
-            <span class="value mono" id="qrCardNumber">—</span>
-          </div>
-          <div class="qr-card-row">
-            <span class="label">Số tiền</span>
-            <span class="value mono amount" id="qrCardAmount">—</span>
-          </div>
-          <div class="qr-card-row">
-            <span class="label">Nội dung</span>
-            <span class="value mono" id="qrCardContent">—</span>
-          </div>
-          <div class="qr-card-perforation"></div>
         </div>
         <div class="qr-empty" id="qrEmpty">
           <p>Điền thông tin bên trái và bấm <strong>Tạo mã QR</strong> để xem trước.</p>
@@ -178,8 +173,9 @@
 
     </div>
 
-    <details class="api-hint-details">
-      <summary>Cú pháp gọi qua link API (dành cho ai tự động hoá, ẩn mặc định)</summary>
+    <!-- Cú pháp gọi API tự động hoá (Shortcuts, script...), gấp lại mặc định cho gọn giao diện -->
+    <details class="details-toggle">
+      <summary>Cú pháp gọi qua link API</summary>
       <p class="hint">
         <span class="mono">?amount=100000&amp;addInfo=...</span> — dùng luôn tài khoản <strong>mặc định</strong>, trả thẳng ảnh QR.<br>
         <span class="mono">?bank=&lt;tên gợi nhớ&gt;&amp;amount=100000&amp;addInfo=...</span> — chọn tài khoản theo tên gợi nhớ đã đặt ở tab Danh sách.<br>

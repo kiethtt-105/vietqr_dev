@@ -1,5 +1,5 @@
 // ============================================================
-// SỔ QUỸ — Trình tạo mã QR VietQR (chạy tĩnh trên GitHub Pages)
+// VietQR Generator — Trình tạo mã QR VietQR (chạy tĩnh trên GitHub Pages)
 // 2 nguồn dữ liệu:
 //   data/vietqr-banks.json  -> danh sách gốc VietQR (tham chiếu, read-only)
 //                              nếu chưa có file này / load lỗi -> tự lấy thẳng từ API VietQR
@@ -22,13 +22,23 @@ const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
 
-// Mẫu hiển thị QR — khai báo dạng dữ liệu (JSON-like), muốn thêm mẫu mới chỉ cần thêm dòng ở đây
-const QR_DISPLAY_TEMPLATES = [
+// Mẫu hiển thị QR: load từ data/templates.json lúc init(), có fallback cứng nếu fetch lỗi
+let QR_DISPLAY_TEMPLATES = [
   { value: "compact2", label: "Compact 2" },
   { value: "compact", label: "Compact" },
   { value: "print", label: "Print" },
   { value: "qr_only", label: "Chỉ mã QR" },
 ];
+async function loadQrDisplayTemplates() {
+  try {
+    const res = await fetch("data/templates.json");
+    if (!res.ok) throw new Error("no file");
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) QR_DISPLAY_TEMPLATES = data;
+  } catch (e) {
+    /* giữ nguyên fallback cứng ở trên nếu file chưa có / lỗi */
+  }
+}
 
 let state = {
   refBanks: [],
@@ -125,6 +135,64 @@ function closeGhModal() {
 }
 function ghApiUrl(path) {
   return `https://api.github.com/repos/${state.gh.owner}/${state.gh.repo}/contents/${path}`;
+}
+
+async function checkGhConnection() {
+  const owner = $("#ghOwner").value.trim();
+  const repo = $("#ghRepo").value.trim();
+  const token = $("#ghToken").value.trim() || getToken();
+  const btn = $("#btnGhCheck");
+  const msgEl = $("#ghCheckMsg");
+
+  if (!owner || !repo) {
+    setStatus(msgEl, "Nhập owner/repo trước đã.", "err");
+    return;
+  }
+
+  btn.disabled = true;
+  const oldLabel = btn.textContent;
+  btn.textContent = "Đang kiểm tra…";
+  setStatus(msgEl, "");
+
+  try {
+    const headers = { Accept: "application/vnd.github+json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+
+    if (res.status === 404) {
+      throw new Error("Không tìm thấy repo, hoặc token chưa được cấp quyền truy cập repo này.");
+    }
+    if (res.status === 401) {
+      throw new Error("Token không hợp lệ hoặc đã hết hạn.");
+    }
+    if (!res.ok) {
+      throw new Error(`GitHub trả về lỗi ${res.status}.`);
+    }
+
+    const data = await res.json();
+    const perm = data.permissions || {};
+
+    if (!token) {
+      setStatus(msgEl, `Repo ${owner}/${repo} tồn tại và công khai. Nhập token để kiểm tra quyền ghi.`, "ok");
+      $("#ghDot").className = "dot";
+    } else if (perm.push) {
+      setStatus(msgEl, `Kết nối OK ✓ — token có quyền ghi vào ${owner}/${repo}.`, "ok");
+      $("#ghDot").className = "dot on";
+    } else if (perm.pull) {
+      setStatus(msgEl, "Repo tồn tại nhưng token chỉ có quyền đọc — cấp lại quyền Contents: Read and write.", "err");
+      $("#ghDot").className = "dot err";
+    } else {
+      setStatus(msgEl, "Đã kết nối tới repo nhưng không xác định được quyền ghi của token.", "err");
+      $("#ghDot").className = "dot err";
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus(msgEl, err.message, "err");
+    $("#ghDot").className = "dot err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldLabel;
+  }
 }
 
 // ---------- Generic GitHub read/write for a JSON file ----------
@@ -480,10 +548,6 @@ function onGenerateQr(e, opts) {
 
   $("#qrImage").src = url;
   $("#qrCardBank").textContent = acc.data__name || acc.data__code;
-  $("#qrCardName").textContent = acc.name_ac || "—";
-  $("#qrCardNumber").textContent = acc.data_num || "—";
-  $("#qrCardAmount").textContent = amount ? formatNumber(amount) + " đ" : "—";
-  $("#qrCardContent").textContent = content || "—";
 
   $("#qrCard").hidden = false;
   $("#qrEmpty").hidden = true;
@@ -607,16 +671,12 @@ function applyApiPrefill() {
   onGenerateQr(null);
 }
 
-// ---------- Tabs ----------
-function initTabs() {
-  $$(".tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      $$(".tab").forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
-      $("#tab-list").hidden = tab.dataset.tab !== "list";
-      $("#tab-qr").hidden = tab.dataset.tab !== "qr";
-    });
-  });
+// ---------- Settings modal (danh sách tài khoản) ----------
+function openSettingsModal() {
+  $("#settingsBackdrop").hidden = false;
+}
+function closeSettingsModal() {
+  $("#settingsBackdrop").hidden = true;
 }
 
 // ---------- Init ----------
@@ -624,11 +684,11 @@ async function init() {
   const handled = await handleApiParams();
   if (handled) return; // đã redirect hoặc in ra text, không cần dựng UI
 
-  initTabs();
   loadGhConfigFromStorage();
 
   await loadRefBanks();
   await loadAccountsInitial();
+  await loadQrDisplayTemplates();
 
   renderTable();
   populateQrTemplateOptions();
@@ -639,8 +699,17 @@ async function init() {
   $("#ghBackdrop").addEventListener("click", (e) => {
     if (e.target.id === "ghBackdrop") closeGhModal();
   });
+
+  $("#btnOpenSettings").addEventListener("click", openSettingsModal);
+  $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
+  $("#settingsBackdrop").addEventListener("click", (e) => {
+    if (e.target.id === "settingsBackdrop") closeSettingsModal();
+  });
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("#ghBackdrop").hidden) closeGhModal();
+    if (e.key !== "Escape") return;
+    if (!$("#ghBackdrop").hidden) closeGhModal();
+    if (!$("#settingsBackdrop").hidden) closeSettingsModal();
   });
   $("#btnToggleTokenVisibility").addEventListener("click", () => {
     const input = $("#ghToken");
@@ -651,11 +720,13 @@ async function init() {
   });
   $("#btnGhSave").addEventListener("click", saveGhConfigToStorage);
   $("#btnGhLoad").addEventListener("click", loadAllFromGithub);
+  $("#btnGhCheck").addEventListener("click", checkGhConnection);
   $("#btnGhForget").addEventListener("click", () => {
     localStorage.removeItem(LS_GH_TOKEN);
     $("#ghToken").value = "";
     updateGhStatusLabel();
     setStatus($("#ghMsg"), "Đã xoá token khỏi trình duyệt.", "ok");
+    setStatus($("#ghCheckMsg"), "");
   });
 
   $("#btnAddRow").addEventListener("click", addRow);
