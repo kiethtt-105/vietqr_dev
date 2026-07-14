@@ -733,7 +733,6 @@ async function init() {
   populateQrAccounts();
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
-  $("#btnOpenSettingsGithub").addEventListener("click", () => openSettingsModal("github"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
   $("#settingsBackdrop").addEventListener("click", (e) => {
     if (e.target.id === "settingsBackdrop") closeSettingsModal();
