@@ -164,12 +164,6 @@ function updateGhStatusLabel() {
   $("#ghDot").className = "dot" + (ok ? " on" : "");
   $("#ghStatusLabel").textContent = ok ? `${state.gh.owner}/${state.gh.repo}` : "Chưa kết nối GitHub";
 }
-function openGhModal() {
-  $("#ghBackdrop").hidden = false;
-}
-function closeGhModal() {
-  $("#ghBackdrop").hidden = true;
-}
 function ghApiUrl(path) {
   return `https://api.github.com/repos/${state.gh.owner}/${state.gh.repo}/contents/${path}`;
 }
@@ -288,8 +282,8 @@ async function loadAllFromGithub() {
 
 async function saveAccountsToGithub() {
   if (!state.gh.owner || !state.gh.repo) {
-    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở panel kết nối phía trên.", "err");
-    openGhModal();
+    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
+    openSettingsModal("github");
     return;
   }
   setStatus($("#ghMsg"), "Đang lưu tài khoản lên GitHub…");
@@ -304,7 +298,7 @@ async function saveAccountsToGithub() {
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    openGhModal();
+    openSettingsModal("github");
   }
 }
 
@@ -709,9 +703,15 @@ function applyApiPrefill() {
   onGenerateQr(null);
 }
 
-// ---------- Settings modal (danh sách tài khoản) ----------
-function openSettingsModal() {
+// ---------- Settings modal (danh sách tài khoản + kết nối GitHub) ----------
+function switchSettingsTab(tabName) {
+  $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
+  $("#settingsTabAccounts").hidden = tabName !== "accounts";
+  $("#settingsTabGithub").hidden = tabName !== "github";
+}
+function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;
+  switchSettingsTab(tabName || "accounts");
 }
 function closeSettingsModal() {
   $("#settingsBackdrop").hidden = true;
@@ -732,22 +732,19 @@ async function init() {
   populateQrTemplateOptions();
   populateQrAccounts();
 
-  $("#btnToggleGithub").addEventListener("click", openGhModal);
-  $("#btnGhClose").addEventListener("click", closeGhModal);
-  $("#ghBackdrop").addEventListener("click", (e) => {
-    if (e.target.id === "ghBackdrop") closeGhModal();
-  });
-
-  $("#btnOpenSettings").addEventListener("click", openSettingsModal);
+  $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
+  $("#btnOpenSettingsGithub").addEventListener("click", () => openSettingsModal("github"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
   $("#settingsBackdrop").addEventListener("click", (e) => {
     if (e.target.id === "settingsBackdrop") closeSettingsModal();
+  });
+  $$(".settings-tabs .tab").forEach((tab) => {
+    tab.addEventListener("click", () => switchSettingsTab(tab.dataset.settingsTab));
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (!$("#confirmBackdrop").hidden) return; // để confirm dialog tự xử lý Escape của riêng nó
-    if (!$("#ghBackdrop").hidden) closeGhModal();
     if (!$("#settingsBackdrop").hidden) closeSettingsModal();
   });
   $("#btnToggleTokenVisibility").addEventListener("click", () => {
