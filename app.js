@@ -4,24 +4,24 @@
 //   data/vietqr-banks.json  -> danh sách gốc VietQR (tham chiếu, read-only)
 //   data/my-accounts.json   -> tài khoản cá nhân (CRUD, đồng bộ GitHub)
 //   data/templates.json     -> mẫu nội dung chuyển khoản (CRUD, đồng bộ GitHub)
+// + Link API dạng ?bank=&stk=&amount=&content=&template=&name=&redirect=1|&format=text
+//   dùng cho iPhone Shortcuts / gọi trực tiếp, giống pattern pos-charge của dự án MoMo.
 // ============================================================
 
 const LS_GH_CONFIG = "vietqr_gh_config";
 const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
 const LS_TEMPLATES_CACHE = "vietqr_templates_cache";
-const LS_DEFAULTS = "vietqr_defaults";
+const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
 
 let state = {
-  refBanks: [], // danh sách gốc VietQR
-  accounts: [], // tài khoản cá nhân
-  templates: [], // mẫu nội dung
+  refBanks: [],
+  accounts: [],
+  templates: [],
   sha: { accounts: null, templates: null },
   gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json", pathTemplates: "data/templates.json" },
-  defaults: { account: null, template: null }, // key mặc định: account = "code::soTK", template = label
-  selectedPresetLabel: null, // mẫu đang chọn trong presetRow, dùng để đặt mặc định
 };
 
 // ---------- utils ----------
@@ -54,67 +54,15 @@ function escapeHtml(v) {
   return String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 function setStatus(el, msg, kind) {
+  if (!el) return;
   el.textContent = msg || "";
   el.className = "status" + (kind ? " " + kind : "");
 }
-
-// ---------- Mặc định (tài khoản + mẫu nội dung) ----------
-function accountKey(acc) {
-  return `${acc.data__code || ""}::${acc.data_num || ""}`;
-}
-function loadDefaults() {
-  try {
-    const d = JSON.parse(localStorage.getItem(LS_DEFAULTS) || "{}");
-    state.defaults = { account: d.account ?? null, template: d.template ?? null };
-  } catch (e) {
-    state.defaults = { account: null, template: null };
-  }
-}
-function saveDefaults() {
-  localStorage.setItem(LS_DEFAULTS, JSON.stringify(state.defaults));
-}
-function setDefaultAccount(idx) {
-  const acc = state.accounts[idx];
-  if (!acc) return;
-  const key = accountKey(acc);
-  state.defaults.account = state.defaults.account === key ? null : key;
-  saveDefaults();
-  renderTable();
-  populateQrAccounts();
-  updateDefaultButtons();
-}
-function setDefaultTemplateByLabel(label) {
-  state.defaults.template = state.defaults.template === label ? null : label;
-  saveDefaults();
-  renderTemplateList();
-  renderPresets();
-  updateDefaultButtons();
-}
-function findDefaultAccountIndex() {
-  if (!state.defaults.account) return -1;
-  return state.accounts.findIndex((a) => accountKey(a) === state.defaults.account);
-}
-function findDefaultTemplate() {
-  if (!state.defaults.template) return null;
-  return state.templates.find((t) => t.label === state.defaults.template) || null;
-}
-function updateDefaultButtons() {
-  const accBtn = $("#btnSetDefaultAccount");
-  if (accBtn) {
-    const idx = Number($("#qrAccount").value);
-    const acc = state.accounts[idx];
-    const isDefault = acc && state.defaults.account === accountKey(acc);
-    accBtn.textContent = isDefault ? "★ Tài khoản mặc định" : "☆ Đặt làm mặc định";
-    accBtn.classList.toggle("active", !!isDefault);
-    accBtn.disabled = !acc;
-  }
-  const tplBtn = $("#btnSetDefaultTemplate");
-  if (tplBtn) {
-    const isDefault = state.selectedPresetLabel && state.defaults.template === state.selectedPresetLabel;
-    tplBtn.textContent = isDefault ? "★ Mẫu mặc định" : "☆ Đặt mẫu đang chọn làm mặc định";
-    tplBtn.classList.toggle("active", !!isDefault);
-    tplBtn.disabled = !state.selectedPresetLabel;
-  }
+function restartAnimation(el) {
+  if (!el) return;
+  el.style.animation = "none";
+  void el.offsetWidth;
+  el.style.animation = "";
 }
 
 // ---------- GitHub config persistence ----------
@@ -210,14 +158,6 @@ async function loadAllFromGithub() {
     renderTemplateList();
     renderPresets();
     populateQrAccounts();
-    const defTpl = findDefaultTemplate();
-    if (defTpl && !$("#qrContent").value) {
-      $("#qrContent").value = defTpl.content;
-      state.selectedPresetLabel = defTpl.label;
-      renderPresets();
-    }
-    generateQr(false);
-    updateDefaultButtons();
     setStatus(
       $("#ghMsg"),
       `Đã tải ${state.accounts.length} tài khoản, ${state.templates.length} mẫu nội dung.`,
@@ -302,7 +242,7 @@ async function refreshRefBanksFromVietQR() {
       logo: b.logo,
       short_name: b.short_name,
     }));
-    fillBankSelects();
+    renderTable();
     btn.textContent = `Đã cập nhật ${state.refBanks.length} ngân hàng ✓`;
   } catch (err) {
     console.error(err);
@@ -321,12 +261,6 @@ function bankOptionsHtml(selectedCode) {
         `<option value="${b.code}" ${b.code === selectedCode ? "selected" : ""}>${escapeHtml(b.shortName)} — ${b.code}</option>`
     )
     .join("");
-}
-function fillBankSelects() {
-  $$(".bank-select").forEach((sel) => {
-    const current = sel.value;
-    sel.innerHTML = bankOptionsHtml(current);
-  });
 }
 
 // ---------- Accounts table CRUD ----------
@@ -365,17 +299,13 @@ function renderTable() {
   const body = $("#bankTableBody");
   body.innerHTML = "";
   state.accounts.forEach((acc, idx) => {
-    const isDefault = state.defaults.account === accountKey(acc);
     const tr = document.createElement("tr");
-    if (isDefault) tr.classList.add("is-default");
     tr.innerHTML = `
-      <td><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}">${
-        isDefault ? '<span class="badge-default">Mặc định</span>' : ""
-      }</td>
+      <td><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}"></td>
       <td><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}"></td>
       <td><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
       <td>
-        <select class="bank-select" data-idx="${idx}" data-field="bank">${bankOptionsHtml(acc.data__code)}</select>
+        <select class="bank-select" data-idx="${idx}">${bankOptionsHtml(acc.data__code)}</select>
         <div class="bank-meta">BIN ${escapeHtml(acc.data__bin || "—")} · id ${acc.data__id ?? "—"}</div>
       </td>
       <td class="row-actions"><button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button></td>`;
@@ -451,40 +381,26 @@ async function loadTemplatesInitial() {
 function renderPresets() {
   const row = $("#presetRow");
   row.innerHTML = state.templates
-    .map(
-      (t) =>
-        `<button type="button" class="preset-chip${
-          state.selectedPresetLabel === t.label ? " active" : ""
-        }">${state.defaults.template === t.label ? "★ " : ""}${escapeHtml(t.label)}</button>`
-    )
+    .map((t) => `<button type="button" class="preset-chip">${escapeHtml(t.label)}</button>`)
     .join("");
   row.querySelectorAll(".preset-chip").forEach((chip, i) => {
     chip.addEventListener("click", () => {
       $("#qrContent").value = state.templates[i].content;
-      state.selectedPresetLabel = state.templates[i].label;
-      renderPresets();
-      updateDefaultButtons();
-      generateQr();
     });
   });
 }
 function renderTemplateList() {
   const ul = $("#tplList");
   ul.innerHTML = state.templates
-    .map((t, i) => {
-      const isDefault = state.defaults.template === t.label;
-      return `<li class="${isDefault ? "is-default" : ""}">
-         <div><div>${escapeHtml(t.label)}${isDefault ? '<span class="badge-default">Mặc định</span>' : ""}</div><span class="tpl-content">${escapeHtml(t.content)}</span></div>
-         <button class="icon-btn" data-tpldel="${i}" title="Xoá mẫu">✕</button></li>`;
-    })
+    .map(
+      (t, i) =>
+        `<li><div><div>${escapeHtml(t.label)}</div><span class="tpl-content">${escapeHtml(t.content)}</span></div>
+         <button class="icon-btn" data-tpldel="${i}" title="Xoá mẫu">✕</button></li>`
+    )
     .join("");
   ul.querySelectorAll("[data-tpldel]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const i = Number(e.target.dataset.tpldel);
-      if (state.defaults.template === state.templates[i].label) {
-        state.defaults.template = null;
-        saveDefaults();
-      }
       state.templates.splice(i, 1);
       localStorage.setItem(LS_TEMPLATES_CACHE, JSON.stringify(state.templates));
       renderTemplateList();
@@ -504,52 +420,79 @@ function addTemplate() {
   renderPresets();
 }
 
+// ---------- Mặc định: tài khoản + mẫu QR (chung cho mọi tài khoản) ----------
+function accountKey(acc) {
+  return `${acc.list_name}|${acc.data_num}`;
+}
+function loadDefaults() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_DEFAULTS) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+function applyDefaults() {
+  const defaults = loadDefaults();
+  if (defaults.accountKey) {
+    const idx = state.accounts.findIndex((a) => accountKey(a) === defaults.accountKey);
+    if (idx >= 0) $("#qrAccount").value = idx;
+  }
+  $("#qrTemplate").value = defaults.template || "compact2";
+}
+function setDefaultAccount() {
+  const idx = Number($("#qrAccount").value);
+  const acc = state.accounts[idx];
+  if (!acc) return;
+  const defaults = loadDefaults();
+  defaults.accountKey = accountKey(acc);
+  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+  flashLinkBtn("#btnSetDefaultAccount", "★ Đã đặt mặc định");
+}
+function setDefaultTemplate() {
+  const defaults = loadDefaults();
+  defaults.template = $("#qrTemplate").value;
+  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+  flashLinkBtn("#btnSetDefaultTemplate", "★ Đã đặt mặc định");
+}
+function flashLinkBtn(sel, text) {
+  const btn = $(sel);
+  const original = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => (btn.textContent = original), 1600);
+}
+
 // ---------- QR tab ----------
 function populateQrAccounts() {
   const sel = $("#qrAccount");
   const prev = sel.value;
   sel.innerHTML = state.accounts
-    .map(
-      (a, i) =>
-        `<option value="${i}">${state.defaults.account === accountKey(a) ? "★ " : ""}${escapeHtml(a.list_name)} — ${escapeHtml(
-          a.data_num
-        )} (${escapeHtml(a.data__code)})</option>`
-    )
+    .map((a, i) => `<option value="${i}">${escapeHtml(a.list_name)} — ${escapeHtml(a.data_num)} (${escapeHtml(a.data__code)})</option>`)
     .join("");
-  const defaultIdx = findDefaultAccountIndex();
-  if (prev !== "" && Number(prev) < state.accounts.length) {
+  if (prev && Number(prev) < state.accounts.length) {
     sel.value = prev;
-  } else if (defaultIdx >= 0) {
-    sel.value = String(defaultIdx);
+  } else {
+    applyDefaults();
   }
 }
-function buildQrUrl(acc, amount, content, template) {
-  const base = `https://img.vietqr.io/image/${encodeURIComponent(acc.data__code)}-${encodeURIComponent(
-    acc.data_num
-  )}-${encodeURIComponent(template)}.png`;
+function buildQrUrlRaw(bankCode, accNum, amount, content, template, accountName) {
+  const base = `https://img.vietqr.io/image/${encodeURIComponent(bankCode)}-${encodeURIComponent(accNum)}-${encodeURIComponent(
+    template
+  )}.png`;
   const params = new URLSearchParams();
   if (amount) params.set("amount", amount);
   if (content) params.set("addInfo", content);
-  if (acc.name_ac) params.set("accountName", acc.name_ac);
+  if (accountName) params.set("accountName", accountName);
   return `${base}?${params.toString()}`;
 }
-function buildShareUrl(acc, amount, content, template) {
-  const params = new URLSearchParams();
-  params.set("bank", acc.data__code || "");
-  params.set("stk", acc.data_num || "");
-  if (amount) params.set("amount", amount);
-  if (content) params.set("content", content);
-  if (template) params.set("template", template);
-  if (acc.name_ac) params.set("name", acc.name_ac);
-  return `${location.origin}${location.pathname}?${params.toString()}`;
+function buildQrUrl(acc, amount, content, template) {
+  return buildQrUrlRaw(acc.data__code, acc.data_num, amount, content, template, acc.name_ac);
 }
-function generateQr(alertIfMissing, accOverride) {
-  const acc = accOverride || state.accounts[Number($("#qrAccount").value)];
+function onGenerateQr(e) {
+  if (e) e.preventDefault();
+  const idx = Number($("#qrAccount").value);
+  const acc = state.accounts[idx];
   if (!acc) {
-    if (alertIfMissing) alert("Chưa có tài khoản nào — thêm ở tab Danh sách tài khoản trước.");
-    $("#qrCard").hidden = true;
-    $("#qrEmpty").hidden = false;
-    $("#qrActions").hidden = true;
+    alert("Chưa có tài khoản nào — thêm ở tab Danh sách tài khoản trước.");
     return;
   }
   const amount = rawNumber($("#qrAmount").value);
@@ -569,48 +512,77 @@ function generateQr(alertIfMissing, accOverride) {
   $("#qrActions").hidden = false;
   $("#btnDownload").href = url;
   $("#btnCopyLink").dataset.url = url;
-  $("#btnCopyApiLink").dataset.url = buildShareUrl(acc, amount, content, template);
-}
-// debounce nhẹ để không gọi ảnh QR liên tục khi gõ nhanh
-let qrDebounceTimer = null;
-function generateQrDebounced() {
-  clearTimeout(qrDebounceTimer);
-  qrDebounceTimer = setTimeout(() => generateQr(false), 250);
-}
-function onGenerateQr(e) {
-  e.preventDefault();
-  generateQr(true);
+
+  const apiParams = new URLSearchParams();
+  apiParams.set("bank", acc.data__code);
+  apiParams.set("stk", acc.data_num);
+  if (amount) apiParams.set("amount", amount);
+  if (content) apiParams.set("content", content);
+  apiParams.set("template", template);
+  apiParams.set("redirect", "1");
+  const apiUrl = `${location.origin}${location.pathname}?${apiParams.toString()}`;
+  $("#btnCopyApiLink").dataset.url = apiUrl;
+
+  restartAnimation($("#qrCard"));
+  restartAnimation($("#qrStamp"));
 }
 
-// ---------- API qua URL query (?bank=VCB&stk=...&amount=...&content=...&template=...) ----------
-// Chế độ:
-//   (mặc định)     -> mở trang, tự điền form + hiện thẻ QR xem trước
-//   &redirect=1    -> chuyển thẳng trình duyệt sang ảnh QR (dùng như link ảnh trực tiếp)
-//   &format=text   -> trang chỉ in ra đúng 1 dòng là link ảnh QR (dễ cho code khác đọc)
-function handleQueryApi() {
-  const q = new URLSearchParams(location.search);
-  const bank = (q.get("bank") || "").trim();
-  const stk = (q.get("stk") || q.get("acc") || "").trim();
-  if (!bank || !stk) return null;
+// ---------- Link API: ?bank=&stk=&amount=&content=&template=&name=&redirect=1|format=text ----------
+function handleApiParams() {
+  const params = new URLSearchParams(window.location.search);
+  const bank = params.get("bank");
+  const stk = params.get("stk");
+  if (!bank || !stk) return false;
 
-  const amount = rawNumber(q.get("amount") || "");
-  const content = (q.get("content") || q.get("noidung") || q.get("info") || "").trim();
-  const name = (q.get("name") || q.get("ten") || "").trim();
-  const template = (q.get("template") || q.get("mau") || "compact2").trim();
-  const acc = { data__code: bank.toUpperCase(), data_num: stk, name_ac: name, data__name: bank.toUpperCase() };
-  const url = buildQrUrl(acc, amount, content, template);
+  const amount = rawNumber(params.get("amount") || "");
+  const content = params.get("content") || "";
+  const template = params.get("template") || loadDefaults().template || "compact2";
+  const name = params.get("name") || "";
+  const url = buildQrUrlRaw(bank, stk, amount, content, template, name);
 
-  if (q.get("redirect") === "1") {
-    location.replace(url);
-    return "handled";
+  if (params.get("redirect") === "1") {
+    window.location.replace(url);
+    return true;
   }
-  if (q.get("format") === "text") {
-    document.open();
-    document.write(url);
-    document.close();
-    return "handled";
+  if (params.get("format") === "text") {
+    document.documentElement.innerHTML = "";
+    document.body = document.createElement("body");
+    document.body.style.cssText = "margin:0;padding:16px;font-family:monospace;font-size:13px;background:#fff;color:#000;word-break:break-all;";
+    document.body.textContent = url;
+    document.title = "VietQR link";
+    return true;
   }
-  return { acc, amount, content, template, url };
+
+  // Không redirect/text -> điền sẵn vào form bình thường sau khi init xong
+  window.__apiPrefill = { bank, stk, amount, content, template, name };
+  return false;
+}
+function applyApiPrefill() {
+  const p = window.__apiPrefill;
+  if (!p) return;
+  let idx = state.accounts.findIndex((a) => a.data__code === p.bank && a.data_num === p.stk);
+  if (idx < 0) {
+    state.accounts.push({
+      data__id: 0,
+      list_name: "Từ link",
+      data_num: p.stk,
+      name_ac: p.name || "",
+      data__name: p.bank,
+      data__code: p.bank,
+      data__bin: "",
+      data__shortName: p.bank,
+      data__logo: "",
+      data__short_name: p.bank,
+    });
+    renderTable();
+    populateQrAccounts();
+    idx = state.accounts.length - 1;
+  }
+  $("#qrAccount").value = idx;
+  $("#qrAmount").value = formatNumber(p.amount);
+  $("#qrContent").value = p.content;
+  if (p.template) $("#qrTemplate").value = p.template;
+  onGenerateQr(null);
 }
 
 // ---------- Tabs ----------
@@ -627,12 +599,11 @@ function initTabs() {
 
 // ---------- Init ----------
 async function init() {
-  const apiParams = handleQueryApi();
-  if (apiParams === "handled") return; // đã redirect hoặc in ra link, không cần vẽ giao diện
+  const handled = handleApiParams();
+  if (handled) return; // đã redirect hoặc in ra text, không cần dựng UI
 
   initTabs();
   loadGhConfigFromStorage();
-  loadDefaults();
 
   await loadRefBanks();
   await loadAccountsInitial();
@@ -642,24 +613,6 @@ async function init() {
   renderTemplateList();
   renderPresets();
   populateQrAccounts();
-
-  if (apiParams) {
-    // Có tham số trên URL (?bank=..&stk=..) -> ưu tiên điền theo link, bỏ qua mặc định đã lưu
-    $("#qrAmount").value = formatNumber(apiParams.amount);
-    $("#qrContent").value = apiParams.content;
-    $("#qrTemplate").value = apiParams.template;
-    generateQr(false, apiParams.acc);
-  } else {
-    // Mở trang bình thường: tự điền nội dung theo mẫu mặc định (nếu có) và tạo sẵn mã QR xem trước
-    const defTpl = findDefaultTemplate();
-    if (defTpl && !$("#qrContent").value) {
-      $("#qrContent").value = defTpl.content;
-      state.selectedPresetLabel = defTpl.label;
-      renderPresets();
-    }
-    generateQr(false);
-  }
-  updateDefaultButtons();
 
   $("#btnToggleGithub").addEventListener("click", () => {
     $("#ghPanel").hidden = !$("#ghPanel").hidden;
@@ -686,22 +639,12 @@ async function init() {
   $("#btnAddTemplate").addEventListener("click", addTemplate);
   $("#btnSaveTemplates").addEventListener("click", saveTemplatesToGithub);
 
+  $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
+  $("#btnSetDefaultTemplate").addEventListener("click", setDefaultTemplate);
+
   $("#qrForm").addEventListener("submit", onGenerateQr);
   $("#qrAmount").addEventListener("input", (e) => {
     e.target.value = formatNumber(e.target.value);
-    generateQrDebounced();
-  });
-  $("#qrContent").addEventListener("input", generateQrDebounced);
-  $("#qrAccount").addEventListener("change", () => {
-    generateQr(false);
-    updateDefaultButtons();
-  });
-  $("#qrTemplate").addEventListener("change", () => generateQr(false));
-  $("#btnSetDefaultAccount").addEventListener("click", () => {
-    setDefaultAccount(Number($("#qrAccount").value));
-  });
-  $("#btnSetDefaultTemplate").addEventListener("click", () => {
-    if (state.selectedPresetLabel) setDefaultTemplateByLabel(state.selectedPresetLabel);
   });
   $("#btnCopyLink").addEventListener("click", async (e) => {
     const url = e.target.dataset.url;
@@ -712,11 +655,17 @@ async function init() {
   });
   $("#btnCopyApiLink").addEventListener("click", async (e) => {
     const url = e.target.dataset.url;
-    if (!url) return;
+    if (!url) {
+      alert("Tạo mã QR trước đã, rồi mới sao chép link API.");
+      return;
+    }
     await navigator.clipboard.writeText(url);
     e.target.textContent = "Đã sao chép ✓";
     setTimeout(() => (e.target.textContent = "Sao chép link API"), 1500);
   });
+
+  applyDefaults();
+  applyApiPrefill();
 }
 
 document.addEventListener("DOMContentLoaded", init);

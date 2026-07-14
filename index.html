@@ -5,28 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sổ Quỹ · Tạo mã QR chuyển khoản</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="app">
 
-  <!-- ===== HEADER ===== -->
-  <header class="topbar">
-    <div class="brand">
+  <!-- ===== HEADER / "BÌA SỔ" ===== -->
+  <header class="cover">
+    <div class="cover-texture"></div>
+    <div class="cover-seam"></div>
+    <div class="brand" tabindex="0">
       <span class="brand-mark">◱</span>
       <div class="brand-text">
-        <h1>SỔ QUỸ</h1>
+        <h1 class="emboss">SỔ QUỸ</h1>
         <p>Trình tạo mã QR chuyển khoản · VietQR</p>
       </div>
     </div>
 
-    <button class="btn ghost" id="btnToggleGithub" type="button">
+    <button class="btn ghost on-cover" id="btnToggleGithub" type="button">
       <span class="dot" id="ghDot"></span>
       <span id="ghStatusLabel">Chưa kết nối GitHub</span>
     </button>
   </header>
+
+  <!-- ===== NỘI DUNG (TRANG GIẤY BÊN TRONG SỔ) ===== -->
+  <div class="pages">
 
   <!-- ===== GITHUB CONNECT PANEL ===== -->
   <section class="gh-panel" id="ghPanel" hidden>
@@ -135,11 +140,10 @@
         <label>
           <span>Mẫu hiển thị QR</span>
           <select id="qrTemplate">
-            <option value="compact2">Compact 2 (khuyên dùng)</option>
+            <option value="compact2">Compact 2</option>
             <option value="compact">Compact</option>
-            <option value="qr_only">Chỉ mã QR</option>
             <option value="print">Print</option>
-            <option value="print2">Print 2</option>
+            <option value="qr_only">Chỉ mã QR</option>
           </select>
         </label>
 
@@ -148,6 +152,7 @@
 
       <div class="qr-result-wrap">
         <div class="qr-card" id="qrCard" hidden>
+          <div class="qr-stamp" id="qrStamp">ĐÃ TẠO</div>
           <div class="qr-card-chip"></div>
           <div class="qr-card-bank" id="qrCardBank">—</div>
           <img id="qrImage" alt="Mã QR chuyển khoản" />
@@ -198,6 +203,8 @@
       <p class="status" id="tplMsg"></p>
     </div>
   </section>
+
+  </div><!-- /.pages -->
 
   <footer class="footer">
     <span>Chạy 100% tĩnh trên GitHub Pages · Ảnh QR lấy trực tiếp từ img.vietqr.io</span>
