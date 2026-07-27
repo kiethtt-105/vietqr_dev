@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sổ Quỹ · Tạo mã QR chuyển khoản</title>
+<title>QR Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=3">
@@ -16,10 +16,10 @@
   <!-- ===== HEADER ===== -->
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">SQ</span>
+      <span class="brand-mark">QR</span>
       <div class="brand-text">
-        <h1>Sổ Quỹ</h1>
-        <p>Ghi tài khoản, tạo mã QR chuyển khoản</p>
+        <h1>QR Generator</h1>
+        <p class="brand-sub">Tạo mã QR chuyển khoản VietQR</p>
       </div>
     </div>
 
@@ -95,15 +95,15 @@
       <div class="settings-tab-panel" id="settingsTabGithub" hidden>
         <div class="gh-grid">
           <label>
-            <span>Chủ repo (owner)</span>
+            <span>Owner</span>
             <input id="ghOwner" type="text" placeholder="vd: tuankiet">
           </label>
           <label>
-            <span>Tên repo</span>
+            <span>Repo</span>
             <input id="ghRepo" type="text" placeholder="vd: vietqr-generator">
           </label>
           <label class="span2">
-            <span>Personal Access Token (fine-grained, quyền Contents: Read & write)</span>
+            <span>Personal Access Token </span>
             <div class="input-with-action">
               <input id="ghToken" type="password" placeholder="github_pat_xxxxxxxxxxxx">
               <button class="icon-btn eye-btn" id="btnToggleTokenVisibility" type="button" aria-label="Hiện/ẩn token">👁</button>
@@ -116,7 +116,7 @@
         </div>
 
         <details class="details-toggle">
-          <summary>Tuỳ chọn nâng cao (branch, đường dẫn file)</summary>
+          <summary>Advanced Options</summary>
           <div class="gh-grid" style="margin-top:10px;">
             <label>
               <span>Branch</span>
@@ -134,9 +134,7 @@
           <button class="btn" id="btnGhLoad" type="button">Tải tài khoản từ GitHub</button>
           <button class="btn subtle" id="btnGhForget" type="button">Xoá token khỏi trình duyệt</button>
         </div>
-        <p class="hint">Token chỉ lưu trong <code>localStorage</code> trên máy này, không commit lên repo. Tạo token tại
-          <span class="mono">github.com → Settings → Developer settings → Fine-grained tokens</span>, cấp quyền
-          <strong>Contents: Read and write</strong> cho đúng repo này.</p>
+
         <p class="status" id="ghMsg"></p>
       </div>
     </section>
@@ -160,7 +158,7 @@
 
         <label>
           <span>Nội dung chuyển khoản</span>
-          <input id="qrContent" type="text" placeholder="vd: TT don hang 1023">
+          <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234">
         </label>
 
         <label>
@@ -194,7 +192,7 @@
   </div><!-- /.pages -->
 
   <footer class="footer">
-    <span>Chạy 100% tĩnh trên GitHub Pages · Ảnh QR lấy trực tiếp từ img.vietqr.io</span>
+    <span> Developed with ❤️ by tuankiet </span>
   </footer>
 </div>
 
