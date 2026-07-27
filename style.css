@@ -1,27 +1,27 @@
 /* =========================================================
-   SỔ QUỸ — giao diện "sổ ghi chép / biên lai giấy"
-   Giấy sổ quỹ, mực xanh navy, dấu mộc đỏ, số liệu kiểu máy in nhiệt.
+   SỔ QUỸ — giao diện tối, kiểu bìa sổ tiết kiệm dập chữ vàng
+   Nền navy đậm, chữ ngà, viền/nút nhấn mạ vàng đồng.
    ========================================================= */
 
 :root{
-  /* --- giấy & mực --- */
-  --paper:#E8E4D6;         /* nền trang giấy sổ */
-  --paper-raised:#F3F0E5;  /* mặt thẻ / ô nhập, giấy sáng hơn 1 nấc */
-  --paper-deep:#DFDBC9;    /* nền phụ, header bảng */
-  --rule:rgba(27,42,60,.14);      /* đường kẻ ngang trang sổ */
-  --rule-strong:rgba(27,42,60,.34);
-  --ink:#1B2A3C;           /* mực navy đậm */
-  --ink-soft:#4B5A6C;
-  --ink-faint:#8C93A0;
+  --bg:#0E121A;
+  --bg-2:#0A0D13;
+  --panel:#161C27;
+  --panel-2:#1D2431;
+  --border:#262E3D;
+  --border-strong:#3A4457;
 
-  /* --- dấu mộc đỏ (accent chính) --- */
-  --stamp:#A2372B;
-  --stamp-dark:#7C2620;
-  --stamp-wash:rgba(162,55,43,.08);
+  --ink:#ECE7D8;          /* ngà, như chữ dập vàng trên bìa tối */
+  --ink-dim:#98A0B0;
+  --ink-faint:#5E6779;
 
-  /* --- mực xanh lá xác nhận (accent phụ) --- */
-  --ok:#2F6D4F;
-  --ok-wash:rgba(47,109,79,.10);
+  --gold:#C9A227;
+  --gold-bright:#E7C662;
+  --gold-dark:#8F7318;
+  --gold-wash:rgba(201,162,39,.10);
+
+  --ok:#3FA772;
+  --danger:#C1443B;
 
   --body:'Inter',sans-serif;
   --display:'Space Grotesk',sans-serif;
@@ -31,116 +31,115 @@
 
 *{box-sizing:border-box;}
 [hidden]{display:none !important;}
-html{background:var(--paper);}
+html{background:var(--bg);}
 html,body{margin:0;padding:0;}
 body{
   min-height:100vh;
   font-family:var(--body);
   color:var(--ink);
-  background:var(--paper);
+  background:
+    radial-gradient(900px 480px at 15% -8%, rgba(201,162,39,.08), transparent 60%),
+    radial-gradient(700px 420px at 100% 0%, rgba(201,162,39,.05), transparent 55%),
+    var(--bg);
   font-size:14px;
 }
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.001ms !important;transition-duration:.001ms !important;}
 }
 
-.app{max-width:1240px;margin:0 auto;min-height:100vh;position:relative;}
-
-/* dòng kẻ sổ mờ chạy suốt trang, như giấy kế toán */
-.app::before{
-  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
-  background-image:repeating-linear-gradient(
-    to bottom, transparent 0 31px, var(--rule) 31px 32px
-  );
-}
-.app > *{position:relative;z-index:1;}
+.app{max-width:1240px;margin:0 auto;min-height:100vh;background:transparent;}
 
 /* ============ HEADER ============ */
 .topbar{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:16px 20px;border-bottom:2px solid var(--ink);
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:15px 20px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg, rgba(201,162,39,.05), transparent);
 }
-.brand{display:flex;align-items:center;gap:12px;}
+.brand{display:flex;align-items:center;gap:11px;min-width:0;flex:1 1 auto;overflow:hidden;}
 .brand-mark{
-  width:34px;height:34px;display:grid;place-items:center;flex:none;
-  border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.02em;
-  color:var(--paper-raised);background:var(--ink);
-  font-family:var(--display);transform:rotate(-4deg);
-  box-shadow:2px 2px 0 var(--stamp-wash);
+  width:32px;height:32px;display:grid;place-items:center;flex:none;
+  border-radius:7px;font-size:12px;font-weight:700;letter-spacing:.02em;
+  color:var(--bg);background:linear-gradient(155deg, var(--gold-bright), var(--gold-dark));
+  font-family:var(--display);
 }
+.brand-text{min-width:0;overflow:hidden;}
 .brand-text h1{
-  margin:0;font-size:17px;font-weight:700;color:var(--ink);
+  margin:0;font-size:clamp(13px,2.6vw,15px);font-weight:700;color:var(--ink);
   font-family:var(--display);letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.brand-text p{margin:1px 0 0;font-size:11px;color:var(--ink-soft);}
+.brand-text p{
+  margin:1px 0 0;font-size:11px;color:var(--ink-dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 
-.topbar-actions{display:flex;align-items:center;gap:8px;}
+.topbar-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
 
-.btn.ghost{background:transparent;border-color:var(--rule-strong);}
-.btn.ghost:hover{border-color:var(--ink);background:var(--paper-raised);}
+.btn.ghost{background:transparent;border-color:var(--border);}
+.btn.ghost:hover{border-color:var(--border-strong);background:var(--panel);}
 .btn.icon-only{padding:8px;width:34px;height:34px;justify-content:center;font-size:14px;}
 .gh-status-pill{
-  font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
   display:inline-flex;align-items:center;gap:7px;
-  border:1px solid var(--rule-strong);border-radius:20px;
-  padding:7px 13px 7px 11px;cursor:default;user-select:none;
-  background:var(--paper-raised);
+  border:1px solid var(--border);border-radius:20px;
+  padding:7px 13px;cursor:default;user-select:none;
+  white-space:nowrap;
 }
 
 /* ============ PAGES WRAPPER ============ */
-.pages{padding:22px 20px 12px;}
+.pages{padding:18px 20px 10px;}
 
 /* ============ BUTTONS ============ */
 .btn{
   position:relative;overflow:hidden;
   font-family:var(--body);font-size:12.5px;font-weight:600;
-  border-radius:7px;border:1.5px solid var(--rule-strong);
-  background:var(--paper-raised);color:var(--ink);
-  padding:8px 14px;cursor:pointer;
+  border-radius:7px;border:1px solid var(--border);
+  background:var(--panel);color:var(--ink);
+  padding:8px 13px;cursor:pointer;
   display:inline-flex;align-items:center;gap:7px;
-  transition:background .12s ease, border-color .12s ease, transform .08s ease;
+  transition:background .12s ease, border-color .12s ease;
 }
-.btn:hover{background:#fff;border-color:var(--ink);}
+.btn:hover{background:var(--panel-2);border-color:var(--border-strong);}
 .btn:active{transform:scale(.97);}
-.btn.primary{background:var(--stamp);color:#fff;border-color:var(--stamp);}
-.btn.primary:hover{background:var(--stamp-dark);border-color:var(--stamp-dark);}
-.btn.danger{background:var(--stamp);color:#fff;border-color:var(--stamp);}
-.btn.danger:hover{background:var(--stamp-dark);border-color:var(--stamp-dark);}
+.btn.primary{background:linear-gradient(155deg, var(--gold-bright), var(--gold));color:#241d05;border-color:var(--gold);font-weight:700;}
+.btn.primary:hover{background:linear-gradient(155deg, var(--gold), var(--gold-dark));}
+.btn.danger{background:var(--danger);color:#fff;border-color:var(--danger);}
+.btn.danger:hover{background:#a5382f;border-color:#a5382f;}
 
 /* ============ RIPPLE ============ */
 .icon-btn{position:relative;overflow:hidden;}
 .ripple{
   position:absolute;border-radius:50%;pointer-events:none;
   transform:scale(0);opacity:.5;
-  background:radial-gradient(circle, var(--ink) 0%, transparent 72%);
+  background:radial-gradient(circle, var(--gold-bright) 0%, transparent 72%);
   animation:ripple-pop .6s cubic-bezier(.22,.8,.32,1) forwards;
 }
 .btn.primary .ripple, .btn.danger .ripple{
   background:radial-gradient(circle, #ffffff 0%, transparent 72%);
-  opacity:.45;
+  opacity:.4;
 }
 @keyframes ripple-pop{ to{transform:scale(2.6);opacity:0;} }
 
-.btn.subtle{background:var(--paper-deep);}
-.btn.full{width:100%;justify-content:center;padding:12px;font-size:13.5px;}
+.btn.subtle{background:var(--panel-2);}
+.btn.full{width:100%;justify-content:center;padding:11px;font-size:13.5px;}
 .btn:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible{
-  outline:2px solid var(--stamp);outline-offset:2px;
+  outline:2px solid var(--gold);outline-offset:2px;
 }
 .link-btn{
   background:none;border:none;padding:2px 0;cursor:pointer;
   font-family:var(--body);font-size:11.5px;font-weight:600;
-  color:var(--stamp);
+  color:var(--gold-bright);
 }
-.link-btn:hover{color:var(--stamp-dark);text-decoration:underline;}
+.link-btn:hover{color:var(--gold);text-decoration:underline;}
 
-.dot{width:6px;height:6px;border-radius:50%;background:var(--rule-strong);display:inline-block;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--border-strong);display:inline-block;}
 .dot.on{background:var(--ok);}
-.dot.err{background:var(--stamp);}
+.dot.err{background:var(--danger);}
 
 /* ============ MODAL ============ */
 .modal-backdrop{
   position:fixed;inset:0;z-index:60;
-  background:rgba(20,26,34,.55);
+  background:rgba(0,0,0,.65);
   display:flex;align-items:center;justify-content:center;
   padding:20px;
 }
@@ -148,21 +147,21 @@ body{
 .modal-backdrop[hidden]{display:none !important;}
 .gh-panel{
   width:100%;max-width:580px;max-height:82vh;overflow-y:auto;
-  background:var(--paper-raised);border:1.5px solid var(--ink);
-  border-radius:var(--radius);padding:20px 22px 22px;
-  box-shadow:6px 6px 0 var(--stamp-wash);
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:11px;padding:18px 20px 20px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
 }
-.gh-panel.settings-panel{max-width:920px;}
+.gh-panel.settings-panel{max-width:900px;}
 .settings-tabs{margin-top:2px;}
 .settings-tab-panel{padding-top:14px;}
-.confirm-panel{max-width:340px;text-align:center;padding:24px 22px 20px;box-shadow:5px 5px 0 var(--stamp-wash);}
+.confirm-panel{max-width:340px;text-align:center;padding:22px 22px 20px;}
 .confirm-message{margin:0 0 16px;font-size:13.5px;color:var(--ink);line-height:1.5;}
 .confirm-actions{margin-top:0;justify-content:center;}
 .confirm-actions .btn{flex:1;justify-content:center;max-width:130px;}
 .gh-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.gh-panel-head h2{font-size:15px;margin:0;font-weight:700;font-family:var(--display);}
+.gh-panel-head h2{font-size:14.5px;margin:0;font-weight:700;font-family:var(--display);}
 .gh-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.gh-grid label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+.gh-grid label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--ink-dim);}
 .gh-grid label.span2{grid-column:1 / -1;}
 .input-with-action{position:relative;display:flex;}
 .input-with-action input{flex:1;padding-right:36px;}
@@ -174,18 +173,18 @@ body{
 }
 input,select{
   font-family:var(--mono);font-size:12.5px;
-  background:var(--paper);border:1.5px solid var(--rule-strong);
+  background:var(--bg);border:1px solid var(--border);
   border-radius:6px;padding:8px 10px;color:var(--ink);
 }
-input:hover,select:hover{border-color:var(--ink-soft);}
-input:focus,select:focus{border-color:var(--stamp);}
+input:hover,select:hover{border-color:var(--border-strong);}
+input:focus,select:focus{border-color:var(--gold);}
 input::placeholder{color:var(--ink-faint);}
 .gh-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
 .hint{font-size:11px;color:var(--ink-faint);line-height:1.6;margin:10px 0 0;}
-.hint .mono, code{font-family:var(--mono);background:var(--paper-deep);padding:1px 5px;border-radius:4px;color:var(--stamp-dark);}
-.status{font-size:11.5px;margin:8px 0 0;min-height:14px;color:var(--ink-soft);}
+.hint .mono, code{font-family:var(--mono);background:var(--panel-2);padding:1px 5px;border-radius:4px;color:var(--gold-bright);}
+.status{font-size:11.5px;margin:8px 0 0;min-height:14px;color:var(--ink-dim);}
 .status.ok{color:var(--ok);}
-.status.err{color:var(--stamp);}
+.status.err{color:var(--danger);}
 .status.inline{margin:0;}
 
 /* ============ CHI TIẾT GẤP ============ */
@@ -200,11 +199,11 @@ input::placeholder{color:var(--ink-faint);}
   content:"▸";display:inline-block;transition:transform .18s ease;transform-origin:center;
 }
 .details-toggle[open] summary::before{transform:rotate(90deg);}
-.details-toggle summary:hover{color:var(--ink-soft);}
+.details-toggle summary:hover{color:var(--ink-dim);}
 .details-toggle .hint{margin-top:8px;}
 
 /* ============ TABS ============ */
-.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--ink);}
+.tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);}
 .tab{
   position:relative;
   font-family:var(--body);font-weight:600;font-size:12.5px;
@@ -212,102 +211,89 @@ input::placeholder{color:var(--ink-faint);}
   padding:9px 14px 11px;cursor:pointer;
 }
 .tab::after{
-  content:"";position:absolute;left:10px;right:10px;bottom:-2px;height:3px;
-  background:var(--stamp);transform:scaleX(0);transition:transform .18s ease;
+  content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;
+  background:var(--gold);transform:scaleX(0);transition:transform .18s ease;
 }
 .tab:hover{color:var(--ink);}
 .tab.active{color:var(--ink);}
 .tab.active::after{transform:scaleX(1);}
 
 /* ============ PANEL ============ */
-.panel{background:transparent;}
+.panel{background:var(--bg);}
 .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
 .panel-head h2{font-size:14px;margin:0;font-weight:700;}
 .panel-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .count-badge{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
 
-/* ============ TABLE (sổ ghi kiểu bảng kẻ) ============ */
-.table-wrap{overflow-x:auto;border:1.5px solid var(--ink);border-radius:10px;background:var(--paper-raised);}
+/* ============ TABLE ============ */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--panel);}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
 thead th{
-  text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;
-  color:var(--ink-soft);background:var(--paper-deep);font-weight:700;
-  padding:9px 10px;border-bottom:1.5px solid var(--ink);white-space:nowrap;
+  text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--ink-faint);background:var(--panel-2);font-weight:700;
+  padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
 }
 .th-sub{display:none;}
-tbody td{padding:5px 6px;border-bottom:1px dashed var(--rule-strong);vertical-align:middle;}
+tbody td{padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
-tbody tr:hover{background:var(--paper-deep);}
+tbody tr:hover{background:var(--panel-2);}
 td input{width:100%;background:transparent;border:1px solid transparent;border-radius:6px;padding:6px 7px;font-size:12.5px;color:var(--ink);}
-td input:hover{border-color:var(--rule-strong);}
-td input:focus{background:var(--paper);border-color:var(--stamp);}
+td input:hover{border-color:var(--border);}
+td input:focus{background:var(--bg);border-color:var(--gold);}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 .icon-btn{
-  background:transparent;border:1.5px solid var(--rule-strong);border-radius:6px;
-  color:var(--ink-soft);width:26px;height:26px;cursor:pointer;font-size:12px;
+  background:transparent;border:1px solid var(--border);border-radius:6px;
+  color:var(--ink-dim);width:26px;height:26px;cursor:pointer;font-size:12px;
   display:grid;place-items:center;
 }
-.icon-btn:hover{border-color:var(--stamp);color:var(--stamp);}
+.icon-btn:hover{border-color:var(--danger);color:var(--danger);}
 .bank-select{width:100%;}
 .bank-meta{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:2px;}
 
 /* ============ QR TAB ============ */
-.qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start;}
-
-/* form = trang giấy điền tay: nhãn hoa, ô nhập chỉ có gạch chân */
-.qr-form{
-  display:flex;flex-direction:column;gap:3px;
-  border-left:3px solid var(--stamp);padding-left:18px;
-}
-.qr-form > label{display:flex;flex-direction:column;gap:6px;font-size:10.5px;font-weight:700;
-  text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);margin-bottom:12px;}
-.qr-form > label select,
-.qr-form > label input{
-  background:transparent;border:none;border-bottom:1.5px solid var(--rule-strong);
-  border-radius:0;padding:8px 2px;font-size:14px;color:var(--ink);
-}
-.qr-form > label select:hover, .qr-form > label input:hover{border-bottom-color:var(--ink-soft);}
-.qr-form > label select:focus, .qr-form > label input:focus{border-bottom-color:var(--stamp);}
-.qr-form > .link-btn{align-self:flex-start;margin-bottom:13px;}
+.qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
+.qr-form{display:flex;flex-direction:column;gap:3px;}
+.qr-form > label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--ink-dim);margin-bottom:9px;}
+.qr-form > .link-btn{align-self:flex-start;margin-bottom:11px;}
 
 .qr-result-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
 
 .qr-empty{
-  border:1.5px dashed var(--rule-strong);border-radius:var(--radius);
+  border:1px dashed var(--border);border-radius:var(--radius);
   width:100%;min-height:300px;display:grid;place-items:center;
   color:var(--ink-faint);font-size:12.5px;text-align:center;padding:16px;
-  background:var(--paper-raised);
+  background:var(--panel);
 }
 
-/* thẻ QR = biên lai xé, mép trên có lỗ đục, dấu mộc đỏ ở góc */
+/* thẻ QR: viền vàng mảnh, dấu "Đã tạo" mạ vàng ở góc */
 .qr-card{
   position:relative;
   width:100%;max-width:340px;
-  background:var(--paper-raised);border:1.5px dashed var(--ink-soft);border-radius:var(--radius);
-  padding:22px 16px 18px;
-  box-shadow:5px 5px 0 var(--stamp-wash);
+  background:var(--panel);border:1px solid var(--border);border-radius:11px;
+  padding:16px 16px 18px;
+  box-shadow:0 16px 40px rgba(0,0,0,.35);
 }
 .qr-card::before{
-  content:"";position:absolute;top:-1px;left:16px;right:16px;height:14px;
-  background-image:radial-gradient(circle at 7px 7px, var(--paper) 4px, transparent 4.3px);
-  background-size:14px 14px;background-repeat:repeat-x;
+  content:"";position:absolute;inset:0;border-radius:11px;padding:1px;
+  background:linear-gradient(155deg, rgba(201,162,39,.5), transparent 40%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
 }
 .qr-card-stamp{
-  position:absolute;top:12px;right:10px;
-  transform:rotate(-9deg);
-  border:2px solid var(--stamp);border-radius:7px;
-  color:var(--stamp);background:var(--stamp-wash);
+  position:absolute;top:12px;right:12px;
+  border:1px solid var(--gold);border-radius:20px;
+  color:var(--gold-bright);background:var(--gold-wash);
   font-family:var(--mono);font-weight:700;font-size:10px;
-  letter-spacing:.08em;text-transform:uppercase;
-  padding:3px 8px;pointer-events:none;
+  letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 10px;pointer-events:none;
 }
 .qr-card-bank{
   font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--stamp-dark);margin:6px 0 10px;font-family:var(--display);
+  color:var(--gold-bright);margin:2px 70px 10px 0;
 }
 .qr-card img{
   width:100%;aspect-ratio:1/1.15;object-fit:contain;
-  background:#fff;border-radius:8px;padding:8px;border:1px solid var(--rule-strong);
+  background:#fff;border-radius:8px;padding:8px;
 }
 
 .qr-actions{display:flex;gap:8px;width:100%;max-width:340px;flex-wrap:wrap;}
@@ -316,25 +302,29 @@ td input:focus{background:var(--paper);border-color:var(--stamp);}
 /* ============ FOOTER ============ */
 .footer{
   text-align:center;color:var(--ink-faint);font-size:10.5px;
-  padding:16px 16px 20px;
-  border-top:2px solid var(--ink);
+  padding:14px 16px 18px;
+  border-top:1px solid var(--border);
 }
 
 @media (max-width:760px){
   .gh-grid{grid-template-columns:1fr;}
   .qr-layout{grid-template-columns:1fr;}
-  .qr-form{border-left:none;padding-left:0;border-top:3px dashed var(--stamp);padding-top:16px;}
+}
+@media (max-width:480px){
+  .gh-status-pill{display:none;}
+  .brand-text p{display:none;}
 }
 
 /* ============ MÀN HÌNH RỘNG ============ */
 @media (min-width:1100px){
-  .pages{padding:34px 32px 22px;}
-  .topbar{padding:22px 32px;}
-  .qr-layout{gap:52px;}
+  .pages{padding:32px 32px 20px;}
+  .topbar{padding:20px 32px;}
+  .qr-layout{gap:48px;}
   .qr-form{gap:6px;}
-  .qr-form > label{font-size:11px;margin-bottom:16px;}
-  .qr-form select,.qr-form input{font-size:15px;padding:9px 2px;}
-  .qr-form .btn.full{padding:13px;font-size:14.5px;margin-top:6px;}
+  .qr-form > label{font-size:12.5px;margin-bottom:14px;}
+  .qr-form > label span{font-size:12.5px;}
+  input,select{font-size:13.5px;padding:10px 12px;}
+  .qr-form .btn.full{padding:13px;font-size:14.5px;margin-top:4px;}
   .qr-card,.qr-actions{max-width:400px;}
   .qr-empty{min-height:420px;font-size:13.5px;}
 }
