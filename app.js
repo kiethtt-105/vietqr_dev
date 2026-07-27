@@ -421,6 +421,7 @@ function renderTable() {
   state.accounts.forEach((acc, idx) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
       <td><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}"></td>
       <td><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}"></td>
       <td><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>

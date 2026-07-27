@@ -249,6 +249,7 @@ td input:focus{background:var(--bg);border-color:var(--gold);}
 .icon-btn:hover{border-color:var(--danger);color:var(--danger);}
 .bank-select{width:100%;}
 .bank-meta{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:2px;}
+.stt-cell{font-family:var(--mono);color:var(--ink-faint);text-align:center;width:38px;}
 
 /* ============ QR TAB ============ */
 .qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
