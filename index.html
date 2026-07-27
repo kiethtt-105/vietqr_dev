@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VietQR Generator · Tạo mã QR chuyển khoản</title>
+<title>Sổ Quỹ · Tạo mã QR chuyển khoản</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" type="image/png" href="main.png">
 </head>
@@ -16,10 +16,10 @@
   <!-- ===== HEADER ===== -->
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">◱</span>
+      <span class="brand-mark">SQ</span>
       <div class="brand-text">
-        <h1>VietQR Generator</h1>
-        <p>Tạo mã QR chuyển khoản ngân hàng</p>
+        <h1>Sổ Quỹ</h1>
+        <p>Ghi tài khoản, tạo mã QR chuyển khoản</p>
       </div>
     </div>
 
@@ -35,7 +35,7 @@
   <!-- ===== NỘI DUNG ===== -->
   <div class="pages">
 
-  <!-- ===== CONFIRM DIALOG (thay window.confirm mặc định) ===== -->
+  <!-- ===== CONFIRM DIALOG ===== -->
   <div class="modal-backdrop" id="confirmBackdrop" hidden>
     <section class="gh-panel confirm-panel" role="alertdialog" aria-modal="true" aria-label="Xác nhận">
       <p class="confirm-message" id="confirmMessage">Bạn có chắc chắn?</p>
@@ -46,7 +46,7 @@
     </section>
   </div>
 
-  <!-- ===== SETTINGS MODAL: DANH SÁCH TÀI KHOẢN + KẾT NỐI GITHUB ===== -->
+  <!-- ===== SETTINGS MODAL ===== -->
   <div class="modal-backdrop" id="settingsBackdrop" hidden>
     <section class="gh-panel settings-panel" id="settingsPanel" role="dialog" aria-label="Cài đặt">
       <div class="gh-panel-head">
@@ -173,6 +173,7 @@
 
       <div class="qr-result-wrap">
         <div class="qr-card" id="qrCard" hidden>
+          <span class="qr-card-stamp">✓ Đã tạo</span>
           <div class="qr-card-bank" id="qrCardBank">—</div>
           <img id="qrImage" alt="Mã QR chuyển khoản" />
         </div>
