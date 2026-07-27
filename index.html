@@ -84,12 +84,6 @@
             <tbody id="bankTableBody"></tbody>
           </table>
         </div>
-        <p class="hint">Chọn ngân hàng từ danh sách gốc VietQR để tự điền mã/BIN/logo.
-          "Tên gợi nhớ" dùng để gọi tài khoản qua link API (vd: <span class="mono">?bank=Vi+tien+mat</span>).
-          Muốn đặt tài khoản mặc định thì đóng bảng này rồi dùng nút <strong>☆ Đặt làm mặc định</strong> ở form tạo QR.
-          Sửa xong bấm <strong>Lưu lên GitHub</strong> để ghi lại <span class="mono">data/my-accounts.json</span>.
-          Danh sách ngân hàng gốc (<code>data/vietqr-banks.json</code>) chỉ để tra cứu, không cần đồng bộ — nếu chưa
-          có file này thì trang tự lấy trực tiếp từ VietQR, hoặc bấm <strong>Làm mới ngân hàng từ VietQR</strong> ở trên.</p>
       </div>
 
       <!-- ---- TAB: KẾT NỐI GITHUB ---- -->
@@ -101,7 +95,7 @@
           </label>
           <label>
             <span>Repo</span>
-            <input id="ghRepo" type="text" placeholder="vd: vietqr-generator">
+            <input id="ghRepo" type="text" placeholder="vd: vietqr-dev">
           </label>
           <label class="span2">
             <span>Personal Access Token </span>
@@ -150,7 +144,7 @@
           <span>Tài khoản nhận</span>
           <select id="qrAccount"></select>
         </label>
-        <button type="button" class="link-btn" id="btnSetDefaultAccount">☆ Đặt làm mặc định</button>
+        <button type="button" class="link-btn" id="btnSetDefaultAccount"></button>
 
         <label>
           <span>Số tiền (đ)</span>
