@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=4">
 <link rel="icon" type="image/png" href="main.png">
@@ -64,6 +65,7 @@
         <div class="panel-head">
           <span class="count-badge" id="rowCount">0 dòng</span>
           <div class="panel-head-actions">
+            <input class="search-input" id="accountSearch" type="text" placeholder="🔎 Tìm tên gợi nhớ / STK…">
             <button class="btn subtle" id="btnRefreshBanks" type="button">Làm mới ngân hàng từ VietQR</button>
             <button class="btn subtle" id="btnAddRow" type="button">+ Thêm dòng</button>
             <button class="btn primary" id="btnSaveGithub" type="button">Lưu lên GitHub</button>
@@ -100,13 +102,20 @@
           <label class="span2">
             <span>Personal Access Token </span>
             <div class="input-with-action">
-              <input id="ghToken" type="password" placeholder="github_pat_xxxxxxxxxxxx">
+              <input id="ghToken" type="password" placeholder="github_pat_xxxxxxxxxxxx" autocomplete="off" autocapitalize="off" spellcheck="false">
               <button class="icon-btn eye-btn" id="btnToggleTokenVisibility" type="button" aria-label="Hiện/ẩn token">👁</button>
             </div>
             <div class="token-check-row">
               <button class="btn subtle" id="btnGhCheck" type="button">Kiểm tra kết nối</button>
               <span class="status inline" id="ghCheckMsg"></span>
             </div>
+            <p class="hint">
+              ⚠ Token được lưu <strong>dạng thô (plaintext)</strong> trong localStorage của trình duyệt này — bất kỳ
+              ai dùng chung máy/profile hoặc extension độc hại đọc được localStorage đều có thể lấy token.
+              Nên tạo <span class="mono">fine-grained personal access token</span> chỉ cấp quyền
+              <span class="mono">Contents: Read and write</span> cho đúng 1 repo này, đặt hạn dùng ngắn, và bấm
+              "Xoá token khỏi trình duyệt" khi dùng xong trên máy không phải của mình.
+            </p>
           </label>
         </div>
 
@@ -150,11 +159,20 @@
           <span>Số tiền (đ)</span>
           <input id="qrAmount" type="text" inputmode="numeric" placeholder="0">
         </label>
+        <p class="field-warning" id="qrAmountWarning" hidden></p>
+        <div class="quick-amounts" id="quickAmounts">
+          <button type="button" class="chip" data-val="50000">50K</button>
+          <button type="button" class="chip" data-val="100000">100K</button>
+          <button type="button" class="chip" data-val="200000">200K</button>
+          <button type="button" class="chip" data-val="500000">500K</button>
+          <button type="button" class="chip" data-val="1000000">1Tr</button>
+        </div>
 
         <label>
           <span>Nội dung chuyển khoản</span>
-          <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234">
+          <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234" maxlength="90">
         </label>
+        <p class="field-counter" id="qrContentCounter">0/25</p>
 
         <label>
           <span>Mẫu hiển thị QR</span>
@@ -168,9 +186,18 @@
         <div class="qr-card" id="qrCard" hidden>
           <span class="qr-card-stamp">✓ Đã tạo</span>
           <div class="qr-card-bank" id="qrCardBank">—</div>
-          <img id="qrImage" alt="Mã QR chuyển khoản" />
+          <div class="qr-card-imgwrap">
+            <img id="qrImageA" alt="Mã QR chuyển khoản" />
+            <img id="qrImageB" alt="Mã QR chuyển khoản" />
+          </div>
         </div>
         <div class="qr-empty" id="qrEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <path d="M14 14h3v3h-3zM14 20h7M20 14v3M17.5 20v1M20 20v0.01"></path>
+          </svg>
           <p>Điền thông tin bên trái và bấm <strong>Tạo mã QR</strong> để xem trước.</p>
         </div>
         <div class="qr-actions" id="qrActions" hidden>
@@ -190,6 +217,8 @@
     <span> Developed with ❤️ by tuankiet </span>
   </footer>
 </div>
+
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
 <script src="app.js"></script>
 </body>

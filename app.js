@@ -19,8 +19,12 @@ const LS_GH_CONFIG = "vietqr_gh_config";
 const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
 const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
+const LS_REFBANKS_CACHE = "vietqr_refbanks_cache"; // { data, fetchedAt }
+const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000; // 12 giờ — tránh gọi API VietQR mỗi lần mở app
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
+const ADDINFO_SOFT_LIMIT = 25; // giới hạn addInfo phổ biến của nhiều ngân hàng qua VietQR
+const AMOUNT_WARN_THRESHOLD = 500_000_000; // ngưỡng cảnh báo số tiền bất thường
 
 // Mẫu hiển thị QR: load từ data/templates.json lúc init(), có fallback cứng nếu fetch lỗi
 let QR_DISPLAY_TEMPLATES = [
@@ -82,6 +86,22 @@ function showConfirm(message, okLabel) {
     backdrop.addEventListener("click", onBackdropClick);
     document.addEventListener("keydown", onKeydown);
   });
+}
+
+// ---------- Toast notification ----------
+function showToast(message, kind) {
+  const stack = document.getElementById("toastStack");
+  if (!stack) return;
+  const toast = document.createElement("div");
+  toast.className = "toast" + (kind ? " " + kind : "");
+  toast.textContent = message;
+  stack.appendChild(toast);
+  const remove = () => {
+    toast.classList.add("leaving");
+    setTimeout(() => toast.remove(), 180);
+  };
+  setTimeout(remove, 2600);
+  toast.addEventListener("click", remove);
 }
 
 // ---------- utils ----------
@@ -286,6 +306,9 @@ async function saveAccountsToGithub() {
     openSettingsModal("github");
     return;
   }
+  const btn = $("#btnSaveGithub");
+  btn.classList.add("is-loading");
+  btn.disabled = true;
   setStatus($("#ghMsg"), "Đang lưu tài khoản lên GitHub…");
   try {
     state.sha.accounts = await ghWriteJson(
@@ -295,10 +318,15 @@ async function saveAccountsToGithub() {
       `chore: cập nhật my-accounts.json (${new Date().toISOString()})`
     );
     setStatus($("#ghMsg"), "Đã lưu danh sách tài khoản lên GitHub ✓", "ok");
+    showToast("Đã lưu tài khoản lên GitHub ✓", "ok");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
+    showToast("Lỗi khi lưu lên GitHub", "err");
     openSettingsModal("github");
+  } finally {
+    btn.classList.remove("is-loading");
+    btn.disabled = false;
   }
 }
 
@@ -315,6 +343,23 @@ function mapVietQrApiBanks(payload) {
     short_name: b.short_name,
   }));
 }
+function readRefBanksCache() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_REFBANKS_CACHE) || "null");
+    if (raw && Array.isArray(raw.data) && raw.data.length) return raw;
+  } catch (e) {}
+  return null;
+}
+function writeRefBanksCache(data) {
+  try {
+    localStorage.setItem(LS_REFBANKS_CACHE, JSON.stringify({ data, fetchedAt: Date.now() }));
+  } catch (e) {}
+}
+async function fetchRefBanksFromApi() {
+  const res = await fetch(VIETQR_BANKS_API);
+  const payload = await res.json();
+  return mapVietQrApiBanks(payload);
+}
 async function loadRefBanks() {
   // Ưu tiên file cục bộ trong repo, nếu chưa có / lỗi thì lấy thẳng từ API VietQR
   // (đây là nguyên nhân chính khiến "+ Thêm dòng" trước đó như không hoạt động:
@@ -329,31 +374,44 @@ async function loadRefBanks() {
     }
     throw new Error("empty local file");
   } catch (e) {
-    /* rơi xuống lấy từ API */
+    /* rơi xuống lấy từ cache/API */
+  }
+  // Cache theo timestamp: chỉ gọi API VietQR nếu chưa có cache hoặc cache đã quá TTL,
+  // tránh việc mỗi lần mở app đều gọi lại API bên ngoài.
+  const cached = readRefBanksCache();
+  if (cached && Date.now() - cached.fetchedAt < REFBANKS_TTL_MS) {
+    state.refBanks = cached.data;
+    return;
   }
   try {
-    const res = await fetch(VIETQR_BANKS_API);
-    const payload = await res.json();
-    state.refBanks = mapVietQrApiBanks(payload);
+    const banks = await fetchRefBanksFromApi();
+    if (banks.length) {
+      state.refBanks = banks;
+      writeRefBanksCache(banks);
+      return;
+    }
+    throw new Error("empty api response");
   } catch (e2) {
-    state.refBanks = [];
+    // API lỗi/hết hạn mức -> vẫn dùng cache cũ nếu có, còn hơn danh sách rỗng
+    state.refBanks = cached ? cached.data : [];
   }
 }
 async function refreshRefBanksFromVietQR() {
   const btn = $("#btnRefreshBanks");
   const original = btn.textContent;
-  btn.textContent = "Đang tải…";
+  btn.classList.add("is-loading");
   btn.disabled = true;
   try {
-    const res = await fetch(VIETQR_BANKS_API);
-    const payload = await res.json();
-    const banks = mapVietQrApiBanks(payload);
+    const banks = await fetchRefBanksFromApi();
     if (!banks.length) throw new Error("Không đọc được dữ liệu từ VietQR");
     state.refBanks = banks;
+    writeRefBanksCache(banks);
     renderTable();
+    btn.classList.remove("is-loading");
     btn.textContent = `Đã cập nhật ${state.refBanks.length} ngân hàng ✓`;
   } catch (err) {
     console.error(err);
+    btn.classList.remove("is-loading");
     btn.textContent = "Lỗi tải — thử lại sau";
   } finally {
     setTimeout(() => {
@@ -417,22 +475,29 @@ function applyBankToRow(idx, bankCode) {
 }
 function renderTable() {
   const body = $("#bankTableBody");
+  const q = ($("#accountSearch")?.value || "").trim().toLowerCase();
   body.innerHTML = "";
+  let shown = 0;
   state.accounts.forEach((acc, idx) => {
+    if (q) {
+      const hay = `${acc.list_name || ""} ${acc.data_num || ""} ${acc.name_ac || ""}`.toLowerCase();
+      if (!hay.includes(q)) return;
+    }
+    shown++;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
-      <td><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}"></td>
-      <td><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}"></td>
-      <td><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
-      <td>
+      <td data-label="Tên gợi nhớ"><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}"></td>
+      <td data-label="Số tài khoản"><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}"></td>
+      <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
+      <td data-label="Ngân hàng">
         <select class="bank-select" data-idx="${idx}">${bankOptionsHtml(acc.data__code)}</select>
         <div class="bank-meta">BIN ${escapeHtml(acc.data__bin || "—")} · id ${acc.data__id ?? "—"}</div>
       </td>
       <td class="row-actions"><button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button></td>`;
     body.appendChild(tr);
   });
-  $("#rowCount").textContent = `${state.accounts.length} dòng`;
+  $("#rowCount").textContent = q ? `${shown}/${state.accounts.length} dòng` : `${state.accounts.length} dòng`;
   if (!state.refBanks.length) {
     setStatus($("#ghMsg"), "Chưa có danh sách ngân hàng — bấm \"Làm mới ngân hàng từ VietQR\".", "err");
   }
@@ -458,9 +523,11 @@ function renderTable() {
       const idx = Number(e.target.dataset.del);
       const ok = await showConfirm(`Xoá dòng "${state.accounts[idx].list_name}"?`);
       if (ok) {
+        const name = state.accounts[idx].list_name;
         state.accounts.splice(idx, 1);
         renderTable();
         populateQrAccounts();
+        showToast(`Đã xoá "${name}"`, "ok");
       }
     });
   });
@@ -565,6 +632,36 @@ function buildQrUrlRaw(bankCode, accNum, amount, content, template, accountName)
 function buildQrUrl(acc, amount, content, template) {
   return buildQrUrlRaw(acc.data__code, acc.data_num, amount, content, template, acc.name_ac);
 }
+// Hai <img> chồng nhau (#qrImageA / #qrImageB): ảnh mới load ngầm ở lớp ẩn,
+// khi load xong mới crossfade lên trên, tránh chớp trắng lúc đổi ảnh QR.
+let qrActiveLayer = "A";
+function validateAmount(rawAmount) {
+  const el = $("#qrAmountWarning");
+  if (!rawAmount) {
+    el.hidden = true;
+    return true;
+  }
+  const n = Number(rawAmount);
+  if (n <= 0) {
+    el.textContent = "Số tiền phải lớn hơn 0.";
+    el.hidden = false;
+    return false;
+  }
+  if (n > AMOUNT_WARN_THRESHOLD) {
+    el.textContent = `Số tiền khá lớn (${formatNumber(n)}đ) — kiểm tra lại trước khi gửi.`;
+    el.hidden = false;
+    return true; // chỉ cảnh báo, không chặn tạo QR
+  }
+  el.hidden = true;
+  return true;
+}
+function updateContentCounter(content) {
+  const counter = $("#qrContentCounter");
+  if (!counter) return;
+  const len = content.length;
+  counter.textContent = `${len}/${ADDINFO_SOFT_LIMIT}`;
+  counter.className = "field-counter" + (len > ADDINFO_SOFT_LIMIT ? " err" : len > ADDINFO_SOFT_LIMIT - 5 ? " warn" : "");
+}
 function onGenerateQr(e, opts) {
   if (e) e.preventDefault();
   const silent = opts && opts.silent;
@@ -577,9 +674,29 @@ function onGenerateQr(e, opts) {
   const amount = rawNumber($("#qrAmount").value);
   const content = $("#qrContent").value.trim();
   const template = $("#qrTemplate").value;
+
+  updateContentCounter(content);
+  validateAmount(amount);
+
   const url = buildQrUrl(acc, amount, content, template);
 
-  $("#qrImage").src = url;
+  const qrCard = $("#qrCard");
+  const layerNext = qrActiveLayer === "A" ? "B" : "A";
+  const imgNext = $(`#qrImage${layerNext}`);
+  const imgCur = $(`#qrImage${qrActiveLayer}`);
+
+  qrCard.classList.add("loading");
+  imgNext.onload = () => {
+    qrCard.classList.remove("loading");
+    imgNext.classList.add("visible");
+    imgCur.classList.remove("visible");
+    qrActiveLayer = layerNext;
+  };
+  imgNext.onerror = () => {
+    qrCard.classList.remove("loading");
+    showToast("Không tải được ảnh QR — img.vietqr.io có thể đang gián đoạn.", "err");
+  };
+  imgNext.src = url;
   $("#qrCardBank").textContent = acc.data__name || acc.data__code;
 
   $("#qrCard").hidden = false;
@@ -792,6 +909,23 @@ async function init() {
 
   $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
 
+  $$("#quickAmounts .chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      $("#qrAmount").value = formatNumber(chip.dataset.val);
+      onGenerateQr(null, { silent: true });
+    });
+  });
+  $("#qrAmount").addEventListener("input", () => {
+    $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+  });
+
+  $("#accountSearch").addEventListener(
+    "input",
+    debounce(() => renderTable(), 200)
+  );
+
   $("#qrForm").addEventListener("submit", (e) => onGenerateQr(e));
   $("#qrAmount").addEventListener("input", (e) => {
     e.target.value = formatNumber(e.target.value);
@@ -801,12 +935,16 @@ async function init() {
   $("#qrAccount").addEventListener("change", () => onGenerateQr(null, { silent: true }));
   $("#qrTemplate").addEventListener("change", () => onGenerateQr(null, { silent: true }));
   $("#qrAmount").addEventListener("input", liveGenerate);
-  $("#qrContent").addEventListener("input", liveGenerate);
+  $("#qrContent").addEventListener("input", (e) => {
+    updateContentCounter(e.target.value.trim()); // phản hồi tức thì, không chờ debounce
+    liveGenerate();
+  });
   $("#btnCopyLink").addEventListener("click", async (e) => {
     const url = e.target.dataset.url;
     if (!url) return;
     await navigator.clipboard.writeText(url);
     e.target.textContent = "Đã sao chép ✓";
+    showToast("Đã sao chép link ảnh", "ok");
     setTimeout(() => (e.target.textContent = "Sao chép link ảnh"), 1500);
   });
   $("#btnCopyApiLink").addEventListener("click", async (e) => {
@@ -817,9 +955,11 @@ async function init() {
     }
     await navigator.clipboard.writeText(url);
     e.target.textContent = "Đã sao chép ✓";
+    showToast("Đã sao chép link API", "ok");
     setTimeout(() => (e.target.textContent = "Sao chép link API"), 1500);
   });
 
+  updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
   if (window.__apiPrefill) {
     applyApiPrefill();
