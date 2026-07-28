@@ -89,19 +89,50 @@ function showConfirm(message, okLabel) {
 }
 
 // ---------- Toast notification ----------
-function showToast(message, kind) {
+const TOAST_MAX_VISIBLE = 4; // giới hạn số toast chồng cùng lúc, tránh spam khi thao tác liên tiếp
+function showToast(message, kind, opts) {
   const stack = document.getElementById("toastStack");
   if (!stack) return;
+  // Nếu đã đầy, dọn bớt toast cũ nhất (không animation-out, để nhường chỗ ngay)
+  while (stack.children.length >= TOAST_MAX_VISIBLE) {
+    stack.firstElementChild.remove();
+  }
+
   const toast = document.createElement("div");
   toast.className = "toast" + (kind ? " " + kind : "");
-  toast.textContent = message;
-  stack.appendChild(toast);
+
+  const textEl = document.createElement("span");
+  textEl.className = "toast-text";
+  textEl.textContent = message;
+  toast.appendChild(textEl);
+
   const remove = () => {
     toast.classList.add("leaving");
     setTimeout(() => toast.remove(), 180);
   };
-  setTimeout(remove, 2600);
-  toast.addEventListener("click", remove);
+
+  const duration = (opts && opts.duration) || 2600;
+  const timer = setTimeout(remove, duration);
+
+  if (opts && opts.actionLabel && opts.onAction) {
+    const actionBtn = document.createElement("button");
+    actionBtn.type = "button";
+    actionBtn.className = "toast-action";
+    actionBtn.textContent = opts.actionLabel;
+    actionBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearTimeout(timer);
+      opts.onAction();
+      remove();
+    });
+    toast.appendChild(actionBtn);
+  }
+
+  toast.addEventListener("click", () => {
+    clearTimeout(timer);
+    remove();
+  });
+  stack.appendChild(toast);
 }
 
 // ---------- utils ----------
@@ -119,10 +150,13 @@ function base64ToUtf8(b64) {
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
+// Dùng Intl.NumberFormat('vi-VN') chuẩn thay vì tự viết logic phân cách hàng nghìn,
+// và cache 1 instance formatter để tránh khởi tạo lại (tra locale data) mỗi lần gõ phím.
+const numberFormatterVi = new Intl.NumberFormat("vi-VN");
 function formatNumber(n) {
   const num = String(n).replace(/[^\d]/g, "");
   if (!num) return "";
-  return Number(num).toLocaleString("vi-VN");
+  return numberFormatterVi.format(Number(num));
 }
 function rawNumber(formatted) {
   return String(formatted).replace(/[^\d]/g, "");
@@ -421,10 +455,12 @@ async function refreshRefBanksFromVietQR() {
   }
 }
 function bankOptionsHtml(selectedCode) {
+  // b.code/b.shortName đến từ API VietQR (hoặc data/vietqr-banks.json) — dữ liệu ngoài,
+  // không nên tin tuyệt đối, luôn escape trước khi ghép vào innerHTML.
   return state.refBanks
     .map(
       (b) =>
-        `<option value="${b.code}" ${b.code === selectedCode ? "selected" : ""}>${escapeHtml(b.shortName)} — ${b.code}</option>`
+        `<option value="${escapeAttr(b.code)}" ${b.code === selectedCode ? "selected" : ""}>${escapeHtml(b.shortName)} — ${escapeHtml(b.code)}</option>`
     )
     .join("");
 }
@@ -492,7 +528,7 @@ function renderTable() {
       <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
       <td data-label="Ngân hàng">
         <select class="bank-select" data-idx="${idx}">${bankOptionsHtml(acc.data__code)}</select>
-        <div class="bank-meta">BIN ${escapeHtml(acc.data__bin || "—")} · id ${acc.data__id ?? "—"}</div>
+        <div class="bank-meta">BIN ${escapeHtml(acc.data__bin || "—")} · id ${escapeHtml(acc.data__id ?? "—")}</div>
       </td>
       <td class="row-actions"><button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button></td>`;
     body.appendChild(tr);
@@ -519,16 +555,25 @@ function renderTable() {
     });
   });
   body.querySelectorAll("[data-del]").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
+    btn.addEventListener("click", (e) => {
       const idx = Number(e.target.dataset.del);
-      const ok = await showConfirm(`Xoá dòng "${state.accounts[idx].list_name}"?`);
-      if (ok) {
-        const name = state.accounts[idx].list_name;
-        state.accounts.splice(idx, 1);
-        renderTable();
-        populateQrAccounts();
-        showToast(`Đã xoá "${name}"`, "ok");
-      }
+      const removedAcc = state.accounts[idx];
+      const name = removedAcc.list_name;
+      state.accounts.splice(idx, 1);
+      renderTable();
+      populateQrAccounts();
+      // Xoá ngay + cho Hoàn tác trong 5s, thay vì chặn bằng confirm dialog mỗi lần
+      showToast(`Đã xoá "${name}"`, "ok", {
+        duration: 5000,
+        actionLabel: "Hoàn tác",
+        onAction: () => {
+          const restoreAt = Math.min(idx, state.accounts.length);
+          state.accounts.splice(restoreAt, 0, removedAcc);
+          renderTable();
+          populateQrAccounts();
+          showToast(`Đã khôi phục "${name}"`, "ok");
+        },
+      });
     });
   });
 }
@@ -604,7 +649,7 @@ function flashLinkBtn(sel, text) {
 function populateQrTemplateOptions() {
   const sel = $("#qrTemplate");
   const prev = sel.value;
-  sel.innerHTML = QR_DISPLAY_TEMPLATES.map((t) => `<option value="${t.value}">${escapeHtml(t.label)}</option>`).join("");
+  sel.innerHTML = QR_DISPLAY_TEMPLATES.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
   if (prev) sel.value = prev;
 }
 function populateQrAccounts() {
