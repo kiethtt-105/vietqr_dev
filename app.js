@@ -846,24 +846,7 @@ async function handleApiParams() {
     return true;
   }
   if (wantsRedirect) {
-    // Trước đây dùng window.location.replace(url) để điều hướng thẳng sang URL ảnh QR.
-    // Vấn đề: khi đó tab Safari không còn là 1 "Trang Web" (HTML document) nữa mà là 1 file ảnh,
-    // nên action "Chạy JavaScript trên Trang Web" của Shortcuts báo lỗi "Lỗi chuyển đổi" (không convert
-    // được URL/ảnh đó thành kiểu "Trang web Safari").
-    // Fix: giữ nguyên document là HTML hợp lệ, chỉ hiển thị mỗi ảnh QR full màn hình -> nhìn giống hệt
-    // ảnh raw nhưng Shortcuts vẫn convert được bình thường.
-    document.documentElement.innerHTML = "";
-    document.title = "VietQR";
-    const style = document.createElement("style");
-    style.textContent =
-      "html,body{margin:0;padding:0;background:#fff;height:100%;} " +
-      "body{display:flex;align-items:center;justify-content:center;} " +
-      "img{max-width:100%;max-height:100vh;display:block;}";
-    document.head.appendChild(style);
-    const img = document.createElement("img");
-    img.src = url;
-    img.alt = "VietQR";
-    document.body.appendChild(img);
+    window.location.replace(url);
     return true;
   }
 
