@@ -340,6 +340,22 @@ async function saveAccountsToGithub() {
     openSettingsModal("github");
     return;
   }
+  const invalidRows = [];
+  state.accounts.forEach((acc, i) => {
+    const missing = [];
+    if (!acc.list_name || !acc.list_name.trim()) missing.push("tên gợi nhớ");
+    if (!acc.data_num || !String(acc.data_num).trim()) missing.push("số tài khoản");
+    if (!acc.name_ac || !acc.name_ac.trim()) missing.push("chủ tài khoản");
+    if (!acc.data__code || !acc.data__code.trim()) missing.push("ngân hàng");
+    if (missing.length) invalidRows.push({ row: i + 1, missing });
+  });
+  if (invalidRows.length) {
+    const detail = invalidRows.map((r) => `dòng ${r.row} (thiếu ${r.missing.join(", ")})`).join("; ");
+    setStatus($("#ghMsg"), `Chưa lưu được: ${detail}. Điền đủ hoặc xoá dòng đó trước khi lưu.`, "err");
+    showToast("Còn dòng tài khoản chưa điền đủ thông tin", "err");
+    openSettingsModal("accounts");
+    return;
+  }
   const btn = $("#btnSaveGithub");
   btn.classList.add("is-loading");
   btn.disabled = true;
