@@ -347,18 +347,26 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .search-input::placeholder{color:var(--ink-faint);}
 
 /* ============ QR LOADING STATE ============ */
-.qr-card.loading .qr-card-imgwrap img.visible{opacity:.25;}
-.qr-card.loading::after{
-  content:"";position:absolute;inset:16px 16px 18px;border-radius:8px;
+.qr-card.loading .qr-card-imgwrap img.visible{opacity:.15;}
+.qr-card.loading .qr-card-imgwrap::before{
+  content:"";position:absolute;inset:0;border-radius:8px;
   background:linear-gradient(100deg, transparent 30%, var(--accent-wash) 50%, transparent 70%);
   background-size:200% 100%;
   animation:qr-shimmer 1.1s ease-in-out infinite;
+  pointer-events:none;
+}
+.qr-card.loading .qr-card-imgwrap::after{
+  content:"";position:absolute;top:50%;left:50%;width:32px;height:32px;
+  margin:-16px 0 0 -16px;border-radius:50%;
+  border:3px solid var(--accent-wash);border-top-color:var(--accent-bright);
+  animation:qr-spin .75s linear infinite;
   pointer-events:none;
 }
 @keyframes qr-shimmer{
   0%{background-position:180% 0;}
   100%{background-position:-20% 0;}
 }
+@keyframes qr-spin{to{transform:rotate(360deg);}}
 
 /* ============ BUTTON SPINNER ============ */
 .btn.is-loading{color:transparent !important;pointer-events:none;position:relative;}
