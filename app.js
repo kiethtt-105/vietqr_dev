@@ -818,7 +818,7 @@ async function handleApiParams() {
   const url = buildQrUrlRaw(resolved.bank, resolved.stk, amount, content, template, resolved.name);
 
   const wantsText = params.get("format") === "text";
-  const wantsRedirect = params.get("redirect") === "1" || (resolved.auto && params.get("redirect") !== "0");
+  const wantsRedirect = params.get("redirect") === "1";
 
   if (wantsText) {
     document.documentElement.innerHTML = "";
@@ -834,7 +834,8 @@ async function handleApiParams() {
     return true;
   }
 
-  // Không redirect/text -> điền sẵn vào form bình thường sau khi init xong
+  // Không redirect/text -> chỉ hiện mã QR, ẩn hết phần còn lại của trang
+  document.body.classList.add("qr-only");
   window.__apiPrefill = { bank: resolved.bank, stk: resolved.stk, amount, content, template, name: resolved.name, idx: resolved.idx };
   return false;
 }
