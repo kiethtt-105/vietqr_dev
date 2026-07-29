@@ -455,6 +455,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .qr-only .qr-actions,
 .qr-only .qr-empty{display:none!important;}
 .qr-only .pages{padding:0;}
-.qr-only .qr-layout{display:flex;justify-content:center;align-items:center;min-height:100vh;}
-.qr-only .qr-result-wrap{width:100%;max-width:420px;padding:20px;}
+.qr-only .qr-layout{display:flex;justify-content:center;align-items:flex-start;min-height:auto;}
+.qr-only .qr-result-wrap{width:100%;max-width:420px;padding:24px 20px;}
 .qr-only .qr-card{margin:0;}
