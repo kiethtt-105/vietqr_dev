@@ -82,5 +82,17 @@
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank"
+  },
+  {
+    "data__id": 43,
+    "list_name": "SHOPEE PAY",
+    "data_num": "0991000012345",
+    "name_ac": "ShopeePay  HUYNH TRAN TUAN KIET",
+    "data__name": "Vietcombank",
+    "data__code": "VCB",
+    "data__bin": "970436",
+    "data__shortName": "Vietcombank",
+    "data__logo": "https://cdn.vietqr.io/img/VCB.png",
+    "data__short_name": "Vietcombank"
   }
 ]
