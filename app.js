@@ -850,8 +850,7 @@ async function handleApiParams() {
     return true;
   }
 
-  // Không redirect/text -> chỉ hiện mã QR, ẩn hết phần còn lại của trang
-  document.body.classList.add("qr-only");
+  // Không redirect/text -> mở giao diện đầy đủ như bình thường, chỉ điền sẵn (prefill) form rồi tạo QR
   window.__apiPrefill = { bank: resolved.bank, stk: resolved.stk, amount, content, template, name: resolved.name, idx: resolved.idx };
   return false;
 }
