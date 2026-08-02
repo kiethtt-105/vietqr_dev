@@ -727,13 +727,12 @@ function updateContentCounter(content) {
 // ---------- Gợi ý số tiền theo con số đang gõ ----------
 // Ví dụ: gõ "5" -> gợi ý 5.000 / 50.000 / 500.000
 //        gõ "15" -> gợi ý 15.000 / 150.000 / 1.500.000
-// Chỉ gợi ý khi số chữ số còn ngắn (1-3 số) — coi như người dùng đang gõ tắt.
-// Khi đã gõ dài hơn (từ 4 số), coi như họ đang nhập số tiền đầy đủ nên ẩn gợi ý, trả về chip mặc định.
+//        gõ "121211" -> gợi ý 121.211.000 / 1.212.110.000 (nếu chưa vượt trần)
+// Không giới hạn số chữ số đang gõ — chỉ lọc bỏ các gợi ý vượt trần hợp lý (AMOUNT_SUGGEST_CAP).
 const AMOUNT_SUGGEST_MULTIPLIERS = [1000, 10000, 100000];
-const AMOUNT_SUGGEST_MAX_DIGITS = 3;
 const AMOUNT_SUGGEST_CAP = 1_000_000_000;
 function computeAmountSuggestions(rawAmount) {
-  if (!rawAmount || rawAmount.length > AMOUNT_SUGGEST_MAX_DIGITS) return [];
+  if (!rawAmount) return [];
   const n = Number(rawAmount);
   if (!n) return [];
   const seen = new Set();
