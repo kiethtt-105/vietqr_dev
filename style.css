@@ -336,6 +336,11 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .chip:active{transform:scale(.96);}
 .chip.active{background:var(--accent-wash);border-color:var(--accent);color:var(--accent-bright);}
 
+.suggest-amounts{align-items:center;}
+.suggest-label{font-size:10.5px;color:var(--ink-faint);margin-right:2px;}
+.chip.suggest{background:var(--accent-wash);border-color:var(--accent-dark);color:var(--accent-bright);}
+.chip.suggest:hover{border-color:var(--accent-bright);background:rgba(76,126,243,.18);}
+
 /* ============ SEARCH INPUT ============ */
 .search-input{
   font-family:var(--body);font-size:12px;

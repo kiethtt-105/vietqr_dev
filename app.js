@@ -723,6 +723,60 @@ function updateContentCounter(content) {
   counter.textContent = `${len}/${ADDINFO_SOFT_LIMIT}`;
   counter.className = "field-counter" + (len > ADDINFO_SOFT_LIMIT ? " err" : len > ADDINFO_SOFT_LIMIT - 5 ? " warn" : "");
 }
+
+// ---------- Gợi ý số tiền theo con số đang gõ ----------
+// Ví dụ: gõ "5" -> gợi ý 5.000 / 50.000 / 500.000
+//        gõ "15" -> gợi ý 15.000 / 150.000 / 1.500.000
+// Chỉ gợi ý khi số chữ số còn ngắn (1-3 số) — coi như người dùng đang gõ tắt.
+// Khi đã gõ dài hơn (từ 4 số), coi như họ đang nhập số tiền đầy đủ nên ẩn gợi ý, trả về chip mặc định.
+const AMOUNT_SUGGEST_MULTIPLIERS = [1000, 10000, 100000];
+const AMOUNT_SUGGEST_MAX_DIGITS = 3;
+const AMOUNT_SUGGEST_CAP = 1_000_000_000;
+function computeAmountSuggestions(rawAmount) {
+  if (!rawAmount || rawAmount.length > AMOUNT_SUGGEST_MAX_DIGITS) return [];
+  const n = Number(rawAmount);
+  if (!n) return [];
+  const seen = new Set();
+  const list = [];
+  AMOUNT_SUGGEST_MULTIPLIERS.forEach((m) => {
+    const v = n * m;
+    if (v > AMOUNT_SUGGEST_CAP || seen.has(v)) return;
+    seen.add(v);
+    list.push(v);
+  });
+  return list;
+}
+function renderAmountSuggestions() {
+  const sugWrap = $("#suggestAmounts");
+  const staticWrap = $("#quickAmounts");
+  if (!sugWrap || !staticWrap) return;
+  const raw = rawNumber($("#qrAmount").value);
+  const list = computeAmountSuggestions(raw);
+
+  if (!list.length) {
+    sugWrap.hidden = true;
+    sugWrap.innerHTML = "";
+    staticWrap.hidden = false;
+    return;
+  }
+
+  staticWrap.hidden = true;
+  sugWrap.hidden = false;
+  sugWrap.innerHTML =
+    `<span class="suggest-label">Gợi ý</span>` +
+    list.map((v) => `<button type="button" class="chip suggest" data-val="${v}">${formatNumber(v)}đ</button>`).join("");
+
+  sugWrap.querySelectorAll(".chip[data-val]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      $("#qrAmount").value = formatNumber(chip.dataset.val);
+      sugWrap.hidden = true;
+      staticWrap.hidden = false;
+      $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+      onGenerateQr(null, { silent: true });
+    });
+  });
+}
+
 function onGenerateQr(e, opts) {
   if (e) e.preventDefault();
   const silent = opts && opts.silent;
@@ -981,6 +1035,7 @@ async function init() {
   $("#qrAmount").addEventListener("input", () => {
     $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
   });
+  $("#qrAmount").addEventListener("input", () => renderAmountSuggestions());
 
   $("#accountSearch").addEventListener(
     "input",
