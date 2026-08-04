@@ -182,49 +182,62 @@
     <div class="qr-layout">
 
       <form class="qr-form" id="qrForm">
-        <div class="form-row">
-          <label>
-            <span>Mẫu chuyển tiền</span>
+
+        <section class="form-section">
+          <h3 class="form-section-title">Mẫu &amp; tài khoản</h3>
+
+          <label class="field">
+            <div class="field-label-row">
+              <span>Mẫu chuyển tiền</span>
+              <button type="button" class="link-btn" id="btnSavePreset">💾 Lưu mẫu hiện tại</button>
+            </div>
             <select id="qrPreset">
               <option value="">— Chọn mẫu (tuỳ chọn) —</option>
             </select>
           </label>
-          <label>
-            <span>Mẫu hiển thị QR</span>
-            <select id="qrTemplate"></select>
-          </label>
-        </div>
-        <button type="button" class="link-btn" id="btnSavePreset">💾 Lưu mẫu chuyển tiền từ form hiện tại</button>
 
-        <label>
-          <span>Tài khoản nhận</span>
-          <select id="qrAccount"></select>
-        </label>
-        <button type="button" class="link-btn" id="btnSetDefaultAccount"></button>
-
-        <label>
-          <span>Số tiền (đ)</span>
-          <input id="qrAmount" type="text" inputmode="numeric" placeholder="0">
-        </label>
-        <p class="field-warning" id="qrAmountWarning" hidden></p>
-        <div class="quick-amounts suggest-amounts" id="suggestAmounts" hidden></div>
-        <div class="quick-amounts" id="quickAmounts">
-          <button type="button" class="chip" data-val="50000">50K</button>
-          <button type="button" class="chip" data-val="100000">100K</button>
-          <button type="button" class="chip" data-val="200000">200K</button>
-          <button type="button" class="chip" data-val="500000">500K</button>
-          <button type="button" class="chip" data-val="1000000">1Tr</button>
-        </div>
-
-        <label>
-          <span>Nội dung chuyển khoản</span>
-          <div class="combo-wrap">
-            <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234" maxlength="90" autocomplete="off">
-            <button type="button" class="combo-toggle" id="btnContentSuggestToggle" aria-label="Gợi ý nội dung" hidden>▾</button>
-            <div class="combo-menu" id="contentSuggestions" hidden></div>
+          <div class="field-row">
+            <label class="field">
+              <div class="field-label-row">
+                <span>Tài khoản nhận</span>
+                <button type="button" class="link-btn" id="btnSetDefaultAccount">☆ Đặt mặc định</button>
+              </div>
+              <select id="qrAccount"></select>
+            </label>
+            <label class="field">
+              <span>Mẫu hiển thị QR</span>
+              <select id="qrTemplate"></select>
+            </label>
           </div>
-        </label>
-        <p class="field-counter" id="qrContentCounter">0/25</p>
+        </section>
+
+        <section class="form-section">
+          <h3 class="form-section-title">Số tiền &amp; nội dung</h3>
+
+          <label class="field">
+            <span>Số tiền (đ)</span>
+            <input id="qrAmount" type="text" inputmode="numeric" placeholder="0">
+          </label>
+          <p class="field-warning" id="qrAmountWarning" hidden></p>
+          <div class="quick-amounts suggest-amounts" id="suggestAmounts" hidden></div>
+          <div class="quick-amounts" id="quickAmounts">
+            <button type="button" class="chip" data-val="50000">50K</button>
+            <button type="button" class="chip" data-val="100000">100K</button>
+            <button type="button" class="chip" data-val="200000">200K</button>
+            <button type="button" class="chip" data-val="500000">500K</button>
+            <button type="button" class="chip" data-val="1000000">1Tr</button>
+          </div>
+
+          <label class="field">
+            <span>Nội dung chuyển khoản</span>
+            <div class="combo-wrap">
+              <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234" maxlength="90" autocomplete="off">
+              <button type="button" class="combo-toggle" id="btnContentSuggestToggle" aria-label="Gợi ý nội dung" hidden>▾</button>
+              <div class="combo-menu" id="contentSuggestions" hidden></div>
+            </div>
+          </label>
+          <p class="field-counter" id="qrContentCounter">0/25</p>
+        </section>
 
         <button class="btn primary full" type="submit">Tạo mã QR</button>
       </form>
