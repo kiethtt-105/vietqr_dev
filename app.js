@@ -18,6 +18,7 @@
 const LS_GH_CONFIG = "vietqr_gh_config";
 const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
+const LS_PRESETS_CACHE = "vietqr_presets_cache";
 const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
 const LS_REFBANKS_CACHE = "vietqr_refbanks_cache"; // { data, fetchedAt }
 const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000; // 12 giờ — tránh gọi API VietQR mỗi lần mở app
@@ -44,11 +45,31 @@ async function loadQrDisplayTemplates() {
   }
 }
 
+// Danh sách nội dung chuyển khoản gợi ý -> load từ data/noi-dung-chuyen-khoan.json
+// Mỗi phần tử là 1 chuỗi (string). Không có -> ẩn hẳn khu vực gợi ý.
+let CONTENT_SUGGESTIONS = [];
+async function loadContentSuggestions() {
+  try {
+    const res = await fetch("data/noi-dung-chuyen-khoan.json");
+    if (!res.ok) throw new Error("no file");
+    const data = await res.json();
+    if (Array.isArray(data)) CONTENT_SUGGESTIONS = data.filter((v) => typeof v === "string" && v.trim());
+  } catch (e) {
+    CONTENT_SUGGESTIONS = [];
+  }
+}
+
+// Mẫu chuyển tiền (preset điền nhanh cả tài khoản/số tiền/mẫu hiển thị/nội dung) —
+// lưu ở state.presets, load/sync giống hệt state.accounts (cache -> file cục bộ -> GitHub).
+// Mỗi phần tử: { name, accountName, amount, content, template }.
+// accountName để trống -> giữ nguyên tài khoản đang chọn khi áp dụng mẫu.
+
 let state = {
   refBanks: [],
   accounts: [],
-  sha: { accounts: null },
-  gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json" },
+  presets: [],
+  sha: { accounts: null, presets: null },
+  gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json", pathPresets: "data/mau-chuyen-tien.json" },
 };
 
 // ---------- Custom confirm dialog (thay window.confirm mặc định) ----------
@@ -196,6 +217,7 @@ function loadGhConfigFromStorage() {
   $("#ghRepo").value = state.gh.repo || "";
   $("#ghBranch").value = state.gh.branch || "main";
   $("#ghPathAccounts").value = state.gh.pathAccounts || "data/my-accounts.json";
+  $("#ghPathPresets").value = state.gh.pathPresets || "data/mau-chuyen-tien.json";
   $("#ghToken").value = localStorage.getItem(LS_GH_TOKEN) || "";
   updateGhStatusLabel();
 }
@@ -204,6 +226,7 @@ function saveGhConfigToStorage() {
   state.gh.repo = $("#ghRepo").value.trim();
   state.gh.branch = $("#ghBranch").value.trim() || "main";
   state.gh.pathAccounts = $("#ghPathAccounts").value.trim() || "data/my-accounts.json";
+  state.gh.pathPresets = $("#ghPathPresets").value.trim() || "data/mau-chuyen-tien.json";
   localStorage.setItem(LS_GH_CONFIG, JSON.stringify(state.gh));
   const token = $("#ghToken").value.trim();
   if (token) localStorage.setItem(LS_GH_TOKEN, token);
@@ -323,9 +346,17 @@ async function loadAllFromGithub() {
       state.sha.accounts = acc.sha;
       localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(acc.data));
     }
+    const presets = await ghReadJson(state.gh.pathPresets);
+    if (presets.data) {
+      state.presets = presets.data;
+      state.sha.presets = presets.sha;
+      savePresetsCache();
+    }
     renderTable();
     populateQrAccounts();
-    setStatus($("#ghMsg"), `Đã tải ${state.accounts.length} tài khoản.`, "ok");
+    populateQrPresets();
+    renderPresetsTable();
+    setStatus($("#ghMsg"), `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền.`, "ok");
     $("#ghDot").className = "dot on";
   } catch (err) {
     console.error(err);
@@ -369,6 +400,45 @@ async function saveAccountsToGithub() {
     );
     setStatus($("#ghMsg"), "Đã lưu danh sách tài khoản lên GitHub ✓", "ok");
     showToast("Đã lưu tài khoản lên GitHub ✓", "ok");
+  } catch (err) {
+    console.error(err);
+    setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
+    showToast("Lỗi khi lưu lên GitHub", "err");
+    openSettingsModal("github");
+  } finally {
+    btn.classList.remove("is-loading");
+    btn.disabled = false;
+  }
+}
+
+async function savePresetsToGithub() {
+  if (!state.gh.owner || !state.gh.repo) {
+    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
+    openSettingsModal("github");
+    return;
+  }
+  const emptyRows = state.presets
+    .map((p, i) => (!p.name || !p.name.trim() ? i + 1 : null))
+    .filter((n) => n != null);
+  if (emptyRows.length) {
+    setStatus($("#ghMsg"), `Mẫu ở dòng ${emptyRows.join(", ")} chưa có tên — điền hoặc xoá trước khi lưu.`, "err");
+    showToast("Còn mẫu chuyển tiền chưa đặt tên", "err");
+    openSettingsModal("presets");
+    return;
+  }
+  const btn = $("#btnSavePresetsGithub");
+  btn.classList.add("is-loading");
+  btn.disabled = true;
+  setStatus($("#ghMsg"), "Đang lưu mẫu chuyển tiền lên GitHub…");
+  try {
+    state.sha.presets = await ghWriteJson(
+      state.gh.pathPresets,
+      state.presets,
+      state.sha.presets,
+      `chore: cập nhật mau-chuyen-tien.json (${new Date().toISOString()})`
+    );
+    setStatus($("#ghMsg"), "Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
+    showToast("Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
@@ -512,6 +582,30 @@ async function ensureAccountsLoaded() {
   } catch (e) {
     state.accounts = [];
   }
+}
+
+// ---------- Presets (mẫu chuyển tiền) cache + load ----------
+function loadPresetsCache() {
+  const cached = localStorage.getItem(LS_PRESETS_CACHE);
+  if (cached) {
+    try {
+      state.presets = JSON.parse(cached);
+      return;
+    } catch (e) {}
+  }
+}
+async function loadPresetsInitial() {
+  loadPresetsCache();
+  if (state.presets.length) return;
+  try {
+    const res = await fetch("data/mau-chuyen-tien.json");
+    if (res.ok) state.presets = await res.json();
+  } catch (e) {
+    state.presets = [];
+  }
+}
+function savePresetsCache() {
+  localStorage.setItem(LS_PRESETS_CACHE, JSON.stringify(state.presets));
 }
 function applyBankToRow(idx, bankCode) {
   const bank = state.refBanks.find((b) => b.code === bankCode);
@@ -668,6 +762,130 @@ function populateQrTemplateOptions() {
   sel.innerHTML = QR_DISPLAY_TEMPLATES.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
   if (prev) sel.value = prev;
 }
+function populateQrPresets() {
+  const sel = $("#qrPreset");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML =
+    `<option value="">— Chọn mẫu (tuỳ chọn) —</option>` +
+    state.presets.map((p, i) => `<option value="${i}">${escapeHtml(p.name || `Mẫu ${i + 1}`)}</option>`).join("");
+  if (prev && Number(prev) < state.presets.length) sel.value = prev;
+}
+function applyTransferPreset() {
+  const sel = $("#qrPreset");
+  const idx = sel.value === "" ? -1 : Number(sel.value);
+  const preset = idx >= 0 ? state.presets[idx] : null;
+  if (!preset) return;
+
+  if (preset.accountName) {
+    const acc = findAccountByNickname(preset.accountName);
+    if (acc) {
+      $("#qrAccount").value = state.accounts.indexOf(acc);
+    } else {
+      showToast(`Không tìm thấy tài khoản "${preset.accountName}" cho mẫu này.`, "err");
+    }
+  }
+  if (preset.amount != null && preset.amount !== "") {
+    $("#qrAmount").value = formatNumber(preset.amount);
+  }
+  if (preset.content != null) {
+    $("#qrContent").value = preset.content;
+    updateContentCounter(String(preset.content).trim());
+  }
+  if (preset.template) {
+    $("#qrTemplate").value = preset.template;
+  }
+  $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+  onGenerateQr(null, { silent: true });
+}
+// Lưu form hiện tại (tài khoản/số tiền/nội dung/mẫu hiển thị) thành 1 mẫu chuyển tiền mới.
+// Chỉ thêm mới được từ đây -- ở Cài đặt chỉ sửa/xoá.
+function saveCurrentFormAsPreset() {
+  const idx = Number($("#qrAccount").value);
+  const acc = state.accounts[idx];
+  const defaultName = $("#qrContent").value.trim() || (acc ? acc.list_name : "Mẫu mới");
+  const name = window.prompt("Tên mẫu chuyển tiền:", defaultName);
+  if (name == null) return; // huỷ
+  const trimmed = name.trim();
+  if (!trimmed) {
+    showToast("Tên mẫu không được để trống", "err");
+    return;
+  }
+  state.presets.push({
+    name: trimmed,
+    accountName: acc ? acc.list_name : "",
+    amount: Number(rawNumber($("#qrAmount").value)) || 0,
+    content: $("#qrContent").value.trim(),
+    template: $("#qrTemplate").value,
+  });
+  savePresetsCache();
+  populateQrPresets();
+  renderPresetsTable();
+  $("#qrPreset").value = String(state.presets.length - 1);
+  showToast(`Đã lưu mẫu "${trimmed}"`, "ok");
+}
+// ---------- Bảng quản lý mẫu chuyển tiền trong Cài đặt (chỉ sửa/xoá) ----------
+function renderPresetsTable() {
+  const body = $("#presetTableBody");
+  if (!body) return;
+  body.innerHTML = "";
+  state.presets.forEach((p, idx) => {
+    const accountOptions =
+      `<option value="">— giữ tài khoản hiện tại —</option>` +
+      state.accounts
+        .map((a) => `<option value="${escapeAttr(a.list_name)}" ${a.list_name === p.accountName ? "selected" : ""}>${escapeHtml(a.list_name)}</option>`)
+        .join("");
+    const templateOptions = QR_DISPLAY_TEMPLATES.map(
+      (t) => `<option value="${escapeAttr(t.value)}" ${t.value === p.template ? "selected" : ""}>${escapeHtml(t.label)}</option>`
+    ).join("");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
+      <td data-label="Tên mẫu"><input data-idx="${idx}" data-field="name" value="${escapeAttr(p.name)}"></td>
+      <td data-label="Tài khoản"><select data-idx="${idx}" data-field="accountName">${accountOptions}</select></td>
+      <td data-label="Số tiền"><input data-idx="${idx}" data-field="amount" inputmode="numeric" value="${escapeAttr(formatNumber(p.amount || ""))}"></td>
+      <td data-label="Nội dung"><input data-idx="${idx}" data-field="content" value="${escapeAttr(p.content)}"></td>
+      <td data-label="Mẫu hiển thị"><select data-idx="${idx}" data-field="template">${templateOptions}</select></td>
+      <td class="row-actions"><button class="icon-btn" title="Xoá mẫu" data-del-preset="${idx}">✕</button></td>`;
+    body.appendChild(tr);
+  });
+  $("#presetRowCount").textContent = `${state.presets.length} mẫu`;
+
+  body.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const idx = Number(e.target.dataset.idx);
+      const field = e.target.dataset.field;
+      if (field === "amount") {
+        e.target.value = formatNumber(e.target.value);
+        state.presets[idx][field] = Number(rawNumber(e.target.value)) || 0;
+      } else {
+        state.presets[idx][field] = e.target.value;
+      }
+      savePresetsCache();
+      populateQrPresets();
+    });
+  });
+  body.querySelectorAll("select").forEach((sel) => {
+    sel.addEventListener("change", (e) => {
+      const idx = Number(e.target.dataset.idx);
+      const field = e.target.dataset.field;
+      state.presets[idx][field] = e.target.value;
+      savePresetsCache();
+    });
+  });
+  body.querySelectorAll("[data-del-preset]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.delPreset);
+      const p = state.presets[idx];
+      const ok = await showConfirm(`Xoá mẫu "${p.name || idx + 1}"?`, "Xoá");
+      if (!ok) return;
+      state.presets.splice(idx, 1);
+      savePresetsCache();
+      renderPresetsTable();
+      populateQrPresets();
+    });
+  });
+}
 function populateQrAccounts() {
   const sel = $("#qrAccount");
   const prev = sel.value;
@@ -774,6 +992,46 @@ function renderAmountSuggestions() {
       onGenerateQr(null, { silent: true });
     });
   });
+}
+
+// ---------- Gợi ý nội dung chuyển khoản: combobox ----------
+// #qrContent luôn gõ tự do bình thường. Nút mũi tên (▾) bật/tắt menu gợi ý bên dưới;
+// không bấm mũi tên thì không có gì hiện ra, không cản trở việc gõ tay.
+function renderContentSuggestions() {
+  const wrap = $("#contentSuggestions");
+  const toggle = $("#btnContentSuggestToggle");
+  if (!wrap || !toggle) return;
+  if (!CONTENT_SUGGESTIONS.length) {
+    toggle.hidden = true;
+    wrap.hidden = true;
+    wrap.innerHTML = "";
+    return;
+  }
+  toggle.hidden = false;
+  wrap.innerHTML = CONTENT_SUGGESTIONS.map((c) => `<button type="button" class="combo-item" data-content="${escapeAttr(c)}">${escapeHtml(c)}</button>`).join("");
+  wrap.querySelectorAll(".combo-item[data-content]").forEach((item) => {
+    item.addEventListener("click", () => {
+      $("#qrContent").value = item.dataset.content;
+      updateContentCounter(item.dataset.content.trim());
+      closeContentSuggestions();
+      onGenerateQr(null, { silent: true });
+    });
+  });
+}
+function openContentSuggestions() {
+  const wrap = $("#contentSuggestions");
+  if (!wrap || !wrap.innerHTML.trim()) return;
+  wrap.hidden = false;
+}
+function closeContentSuggestions() {
+  const wrap = $("#contentSuggestions");
+  if (wrap) wrap.hidden = true;
+}
+function toggleContentSuggestions() {
+  const wrap = $("#contentSuggestions");
+  if (!wrap) return;
+  if (wrap.hidden) openContentSuggestions();
+  else closeContentSuggestions();
 }
 
 function onGenerateQr(e, opts) {
@@ -939,7 +1197,10 @@ function applyApiPrefill() {
 function switchSettingsTab(tabName) {
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
+  $("#settingsTabPresets").hidden = tabName !== "presets";
   $("#settingsTabGithub").hidden = tabName !== "github";
+  if (tabName === "accounts") renderTable();
+  if (tabName === "presets") renderPresetsTable();
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;
@@ -976,11 +1237,16 @@ async function init() {
 
   await loadRefBanks();
   await loadAccountsInitial();
+  await loadPresetsInitial();
   await loadQrDisplayTemplates();
+  await loadContentSuggestions();
 
   renderTable();
   populateQrTemplateOptions();
   populateQrAccounts();
+  populateQrPresets();
+  renderPresetsTable();
+  renderContentSuggestions();
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
@@ -1020,6 +1286,22 @@ async function init() {
     localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
     await saveAccountsToGithub();
   });
+  $("#btnSavePresetsGithub").addEventListener("click", async () => {
+    savePresetsCache();
+    await savePresetsToGithub();
+  });
+  $("#btnSavePreset").addEventListener("click", saveCurrentFormAsPreset);
+
+  $("#btnContentSuggestToggle").addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleContentSuggestions();
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".combo-wrap")) closeContentSuggestions();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeContentSuggestions();
+  });
 
   $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
 
@@ -1049,6 +1331,7 @@ async function init() {
   const liveGenerate = debounce(() => onGenerateQr(null, { silent: true }), 350);
   $("#qrAccount").addEventListener("change", () => onGenerateQr(null, { silent: true }));
   $("#qrTemplate").addEventListener("change", () => onGenerateQr(null, { silent: true }));
+  $("#qrPreset").addEventListener("change", applyTransferPreset);
   $("#qrAmount").addEventListener("input", liveGenerate);
   $("#qrContent").addEventListener("input", (e) => {
     updateContentCounter(e.target.value.trim()); // phản hồi tức thì, không chờ debounce

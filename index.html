@@ -58,6 +58,7 @@
 
       <nav class="tabs settings-tabs">
         <button class="tab active" type="button" data-settings-tab="accounts">Danh sách tài khoản</button>
+        <button class="tab" type="button" data-settings-tab="presets">Mẫu chuyển tiền</button>
         <button class="tab" type="button" data-settings-tab="github">Kết nối GitHub</button>
       </nav>
 
@@ -85,6 +86,33 @@
               </tr>
             </thead>
             <tbody id="bankTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ---- TAB: MẪU CHUYỂN TIỀN (chỉ sửa/xoá — thêm mới từ màn Tạo mã QR) ---- -->
+      <div class="settings-tab-panel" id="settingsTabPresets" hidden>
+        <div class="panel-head">
+          <span class="count-badge" id="presetRowCount">0 mẫu</span>
+          <div class="panel-head-actions">
+            <p class="hint inline-hint">Thêm mẫu mới ở màn "Tạo mã QR" — ở đây chỉ sửa/xoá.</p>
+            <button class="btn primary" id="btnSavePresetsGithub" type="button">Lưu lên GitHub</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="presetTable">
+            <thead>
+              <tr>
+                <th style="width:38px">STT</th>
+                <th>Tên mẫu</th>
+                <th>Tài khoản</th>
+                <th>Số tiền</th>
+                <th>Nội dung</th>
+                <th style="width:150px">Mẫu hiển thị</th>
+                <th style="width:44px"></th>
+              </tr>
+            </thead>
+            <tbody id="presetTableBody"></tbody>
           </table>
         </div>
       </div>
@@ -131,12 +159,16 @@
               <span>File tài khoản cá nhân</span>
               <input id="ghPathAccounts" type="text" value="data/my-accounts.json">
             </label>
+            <label>
+              <span>File mẫu chuyển tiền</span>
+              <input id="ghPathPresets" type="text" value="data/mau-chuyen-tien.json">
+            </label>
           </div>
         </details>
 
         <div class="gh-actions">
           <button class="btn primary" id="btnGhSave" type="button">Lưu thông tin kết nối</button>
-          <button class="btn" id="btnGhLoad" type="button">Tải tài khoản từ GitHub</button>
+          <button class="btn" id="btnGhLoad" type="button">Tải dữ liệu từ GitHub</button>
           <button class="btn subtle" id="btnGhForget" type="button">Xoá token khỏi trình duyệt</button>
         </div>
 
@@ -150,6 +182,20 @@
     <div class="qr-layout">
 
       <form class="qr-form" id="qrForm">
+        <div class="form-row">
+          <label>
+            <span>Mẫu chuyển tiền</span>
+            <select id="qrPreset">
+              <option value="">— Chọn mẫu (tuỳ chọn) —</option>
+            </select>
+          </label>
+          <label>
+            <span>Mẫu hiển thị QR</span>
+            <select id="qrTemplate"></select>
+          </label>
+        </div>
+        <button type="button" class="link-btn" id="btnSavePreset">💾 Lưu mẫu chuyển tiền từ form hiện tại</button>
+
         <label>
           <span>Tài khoản nhận</span>
           <select id="qrAccount"></select>
@@ -172,14 +218,13 @@
 
         <label>
           <span>Nội dung chuyển khoản</span>
-          <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234" maxlength="90">
+          <div class="combo-wrap">
+            <input id="qrContent" type="text" placeholder="Ví dụ: Thanh toán hoá đơn #1234" maxlength="90" autocomplete="off">
+            <button type="button" class="combo-toggle" id="btnContentSuggestToggle" aria-label="Gợi ý nội dung" hidden>▾</button>
+            <div class="combo-menu" id="contentSuggestions" hidden></div>
+          </div>
         </label>
         <p class="field-counter" id="qrContentCounter">0/25</p>
-
-        <label>
-          <span>Mẫu hiển thị QR</span>
-          <select id="qrTemplate"></select>
-        </label>
 
         <button class="btn primary full" type="submit">Tạo mã QR</button>
       </form>
