@@ -5,12 +5,5 @@
     "amount": 500000,
     "content": "9246061 HUYNH TRAN TUAN KIET",
     "template": "compact2"
-  },
-  {
-    "name": "Tiền điện nước",
-    "accountName": "",
-    "amount": 0,
-    "content": "Tiền điện nước",
-    "template": "compact2"
   }
 ]
