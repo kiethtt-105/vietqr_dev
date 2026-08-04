@@ -317,22 +317,52 @@ async function ghReadJson(path) {
 async function ghWriteJson(path, data, sha, message) {
   const token = getToken();
   if (!token) throw new Error("Cần Personal Access Token để ghi lên GitHub.");
-  const body = { message, content: utf8ToBase64(JSON.stringify(data, null, 2)), branch: state.gh.branch };
-  if (sha) body.sha = sha;
-  const res = await fetch(ghApiUrl(path), {
-    method: "PUT",
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const payload = await res.json();
-  if (!res.ok) throw new Error(payload.message || `GitHub trả về lỗi ${res.status} (${path})`);
-  return payload.content.sha;
-}
 
+  async function put(currentSha) {
+    const body = {
+      message,
+      content: utf8ToBase64(JSON.stringify(data, null, 2)),
+      branch: state.gh.branch,
+    };
+    if (currentSha) body.sha = currentSha;
+
+    const res = await fetch(ghApiUrl(path), {
+      method: "PUT",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await res.json();
+    if (!res.ok) {
+      const err = new Error(payload.message || `GitHub trả về lỗi ${res.status} (${path})`);
+      err.status = res.status;
+      throw err;
+    }
+    return payload.content.sha;
+  }
+
+  try {
+    // Nếu chưa có SHA → lấy mới từ GitHub
+    let currentSha = sha;
+    if (!currentSha) {
+      const latest = await ghReadJson(path);
+      currentSha = latest.sha;
+    }
+    return await put(currentSha);
+  } catch (err) {
+    // SHA cũ không khớp → lấy SHA mới nhất rồi thử lại 1 lần
+    const isShaMismatch =
+      err.status === 409 ||
+      (err.message && /does not match|sha.*mismatch|conflict/i.test(err.message));
+    if (!isShaMismatch) throw err;
+
+    const latest = await ghReadJson(path);
+    return await put(latest.sha);
+  }
+}
 async function loadAllFromGithub() {
   if (!state.gh.owner || !state.gh.repo) {
     setStatus($("#ghMsg"), "Nhập owner/repo trước đã.", "err");
