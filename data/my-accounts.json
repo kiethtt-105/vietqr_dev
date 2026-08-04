@@ -9,7 +9,8 @@
     "data__bin": "970436",
     "data__shortName": "Vietcombank",
     "data__logo": "https://cdn.vietqr.io/img/VCB.png",
-    "data__short_name": "Vietcombank"
+    "data__short_name": "Vietcombank",
+    "stt": 1
   },
   {
     "data__id": 38,
@@ -21,7 +22,8 @@
     "data__bin": "970407",
     "data__shortName": "Techcombank",
     "data__logo": "https://cdn.vietqr.io/img/TCB.png",
-    "data__short_name": "Techcombank"
+    "data__short_name": "Techcombank",
+    "stt": 2
   },
   {
     "data__id": 45,
@@ -33,7 +35,8 @@
     "data__bin": "970441",
     "data__shortName": "VIB",
     "data__logo": "https://cdn.vietqr.io/img/VIB.png",
-    "data__short_name": "VIB"
+    "data__short_name": "VIB",
+    "stt": 3
   },
   {
     "data__id": 21,
@@ -45,7 +48,8 @@
     "data__bin": "970422",
     "data__shortName": "MBBank",
     "data__logo": "https://cdn.vietqr.io/img/MB.png",
-    "data__short_name": "MBBank"
+    "data__short_name": "MBBank",
+    "stt": 4
   },
   {
     "data__id": 21,
@@ -57,7 +61,8 @@
     "data__bin": "970422",
     "data__shortName": "MBBank",
     "data__logo": "https://cdn.vietqr.io/img/MB.png",
-    "data__short_name": "MBBank"
+    "data__short_name": "MBBank",
+    "stt": 5
   },
   {
     "data__id": 38,
@@ -69,7 +74,8 @@
     "data__bin": "970407",
     "data__shortName": "Techcombank",
     "data__logo": "https://cdn.vietqr.io/img/TCB.png",
-    "data__short_name": "Techcombank"
+    "data__short_name": "Techcombank",
+    "stt": 6
   },
   {
     "data__id": 17,
@@ -81,7 +87,8 @@
     "data__bin": "970415",
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
-    "data__short_name": "VietinBank"
+    "data__short_name": "VietinBank",
+    "stt": 7
   },
   {
     "data__id": 43,
@@ -93,7 +100,8 @@
     "data__bin": "970436",
     "data__shortName": "Vietcombank",
     "data__logo": "https://cdn.vietqr.io/img/VCB.png",
-    "data__short_name": "Vietcombank"
+    "data__short_name": "Vietcombank",
+    "stt": 8
   },
   {
     "data__id": 65,
@@ -105,7 +113,8 @@
     "data__bin": "971025",
     "data__shortName": "MoMo",
     "data__logo": "https://cdn.vietqr.io/img/momo.png",
-    "data__short_name": "MoMo"
+    "data__short_name": "MoMo",
+    "stt": 9
   },
   {
     "data__id": 17,
@@ -117,6 +126,7 @@
     "data__bin": "970415",
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
-    "data__short_name": "VietinBank"
+    "data__short_name": "VietinBank",
+    "stt": 10
   }
 ]
