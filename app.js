@@ -344,7 +344,8 @@ async function loadAllFromGithub() {
     if (acc.data) {
       state.accounts = acc.data;
       state.sha.accounts = acc.sha;
-      localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(acc.data));
+      sortAccountsByStt();
+      localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
     }
     const presets = await ghReadJson(state.gh.pathPresets);
     if (presets.data) {
@@ -563,13 +564,17 @@ function loadAccountsCache() {
 }
 async function loadAccountsInitial() {
   loadAccountsCache();
-  if (state.accounts.length) return;
+  if (state.accounts.length) {
+    sortAccountsByStt();
+    return;
+  }
   try {
     const res = await fetch("data/my-accounts.json");
     state.accounts = await res.json();
   } catch (e) {
     state.accounts = [];
   }
+  sortAccountsByStt();
 }
 // Dùng cho đường API nhanh (redirect thẳng): chỉ đọc cache / fetch nhẹ, không đụng DOM
 async function ensureAccountsLoaded() {
@@ -619,9 +624,35 @@ function applyBankToRow(idx, bankCode) {
   row.data__logo = bank.logo;
   row.data__short_name = bank.short_name;
 }
+// ---------- Thứ tự hiển thị (STT) ----------
+// STT được lưu thẳng vào từng bản ghi (field "stt", tăng dần từ 1) để thứ tự
+// hiển thị không phụ thuộc vào thứ tự phần tử trong mảng khi đọc/ghi JSON.
+function renumberAccountsStt() {
+  state.accounts.forEach((a, i) => {
+    a.stt = i + 1;
+  });
+}
+function sortAccountsByStt() {
+  const hasStt = state.accounts.some((a) => a && a.stt != null);
+  if (hasStt) {
+    state.accounts.sort((a, b) => (a.stt ?? 9999) - (b.stt ?? 9999));
+  }
+  renumberAccountsStt();
+}
+function moveAccountRow(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= state.accounts.length) return;
+  const tmp = state.accounts[idx];
+  state.accounts[idx] = state.accounts[newIdx];
+  state.accounts[newIdx] = tmp;
+  renumberAccountsStt();
+  renderTable();
+  populateQrAccounts();
+}
 function renderTable() {
   const body = $("#bankTableBody");
   const q = ($("#accountSearch")?.value || "").trim().toLowerCase();
+  const sortable = !q; // sắp xếp thủ công chỉ khả dụng khi không đang lọc, tránh nhầm vị trí
   body.innerHTML = "";
   let shown = 0;
   state.accounts.forEach((acc, idx) => {
@@ -638,9 +669,12 @@ function renderTable() {
       <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
       <td data-label="Ngân hàng">
         <select class="bank-select" data-idx="${idx}">${bankOptionsHtml(acc.data__code)}</select>
-        <div class="bank-meta">BIN ${escapeHtml(acc.data__bin || "—")} · id ${escapeHtml(acc.data__id ?? "—")}</div>
       </td>
-      <td class="row-actions"><button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button></td>`;
+      <td class="row-actions">
+        <button class="icon-btn order-btn" title="Đưa lên trên" data-move="${idx}" data-dir="-1" ${!sortable || idx === 0 ? "disabled" : ""}>▲</button>
+        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-move="${idx}" data-dir="1" ${!sortable || idx === state.accounts.length - 1 ? "disabled" : ""}>▼</button>
+        <button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button>
+      </td>`;
     body.appendChild(tr);
   });
   $("#rowCount").textContent = q ? `${shown}/${state.accounts.length} dòng` : `${state.accounts.length} dòng`;
@@ -664,12 +698,20 @@ function renderTable() {
       populateQrAccounts();
     });
   });
+  body.querySelectorAll("[data-move]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.move);
+      const dir = Number(e.currentTarget.dataset.dir);
+      moveAccountRow(idx, dir);
+    });
+  });
   body.querySelectorAll("[data-del]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const idx = Number(e.target.dataset.del);
       const removedAcc = state.accounts[idx];
       const name = removedAcc.list_name;
       state.accounts.splice(idx, 1);
+      renumberAccountsStt();
       renderTable();
       populateQrAccounts();
       // Xoá ngay + cho Hoàn tác trong 5s, thay vì chặn bằng confirm dialog mỗi lần
@@ -679,6 +721,7 @@ function renderTable() {
         onAction: () => {
           const restoreAt = Math.min(idx, state.accounts.length);
           state.accounts.splice(restoreAt, 0, removedAcc);
+          renumberAccountsStt();
           renderTable();
           populateQrAccounts();
           showToast(`Đã khôi phục "${name}"`, "ok");
@@ -711,6 +754,7 @@ async function addRow() {
     data__logo: defaultBank.logo || "",
     data__short_name: defaultBank.short_name || "",
   });
+  renumberAccountsStt();
   renderTable();
   populateQrAccounts();
 }
@@ -747,6 +791,14 @@ function setDefaultAccount() {
   defaults.accountKey = accountKey(acc);
   localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
   flashLinkBtn("#btnSetDefaultAccount", "★ Đã đặt mặc định");
+}
+// Khi người dùng tự tay đổi tài khoản/số tiền/nội dung/mẫu hiển thị sau khi đã
+// áp dụng 1 mẫu chuyển tiền, bỏ chọn mẫu đó đi -- tránh trường hợp dropdown "Mẫu
+// chuyển tiền" vẫn hiển thị tên mẫu cũ trong khi nội dung form đã không còn khớp
+// với mẫu đó nữa (dễ gây hiểu lầm là mẫu vẫn đang được áp dụng).
+function clearPresetSelection() {
+  const sel = $("#qrPreset");
+  if (sel && sel.value !== "") sel.value = "";
 }
 function flashLinkBtn(sel, text) {
   const btn = $(sel);
@@ -1310,6 +1362,7 @@ async function init() {
       $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
       chip.classList.add("active");
       $("#qrAmount").value = formatNumber(chip.dataset.val);
+      clearPresetSelection();
       onGenerateQr(null, { silent: true });
     });
   });
@@ -1329,12 +1382,22 @@ async function init() {
   });
 
   const liveGenerate = debounce(() => onGenerateQr(null, { silent: true }), 350);
-  $("#qrAccount").addEventListener("change", () => onGenerateQr(null, { silent: true }));
-  $("#qrTemplate").addEventListener("change", () => onGenerateQr(null, { silent: true }));
+  $("#qrAccount").addEventListener("change", () => {
+    clearPresetSelection();
+    onGenerateQr(null, { silent: true });
+  });
+  $("#qrTemplate").addEventListener("change", () => {
+    clearPresetSelection();
+    onGenerateQr(null, { silent: true });
+  });
   $("#qrPreset").addEventListener("change", applyTransferPreset);
-  $("#qrAmount").addEventListener("input", liveGenerate);
+  $("#qrAmount").addEventListener("input", () => {
+    clearPresetSelection();
+    liveGenerate();
+  });
   $("#qrContent").addEventListener("input", (e) => {
     updateContentCounter(e.target.value.trim()); // phản hồi tức thì, không chờ debounce
+    clearPresetSelection();
     liveGenerate();
   });
   $("#btnCopyLink").addEventListener("click", async (e) => {

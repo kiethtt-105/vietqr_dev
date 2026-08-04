@@ -64,15 +64,18 @@
 
       <!-- ---- TAB: DANH SÁCH TÀI KHOẢN ---- -->
       <div class="settings-tab-panel" id="settingsTabAccounts">
-        <div class="panel-head">
-          <span class="count-badge" id="rowCount">0 dòng</span>
-          <div class="panel-head-actions">
+        <div class="panel-head panel-head--accounts">
+          <div class="panel-head-top">
+            <span class="count-badge" id="rowCount">0 dòng</span>
             <input class="search-input" id="accountSearch" type="text" placeholder="🔎 Tìm tên gợi nhớ / STK…">
-            <button class="btn subtle" id="btnRefreshBanks" type="button">Làm mới ngân hàng từ VietQR</button>
+          </div>
+          <div class="panel-head-actions">
+            <button class="icon-btn" id="btnRefreshBanks" type="button" title="Làm mới danh sách ngân hàng từ VietQR" aria-label="Làm mới ngân hàng">⟳</button>
             <button class="btn subtle" id="btnAddRow" type="button">+ Thêm dòng</button>
             <button class="btn primary" id="btnSaveGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
+        <p class="hint inline-hint sort-hint">Dùng ▲▼ để sắp xếp thứ tự hiển thị (chỉ khi không lọc) — thứ tự được lưu vào JSON.</p>
         <div class="table-wrap">
           <table id="bankTable">
             <thead>
@@ -81,8 +84,8 @@
                 <th>Tên gợi nhớ<br><span class="th-sub">list_name</span></th>
                 <th>Số tài khoản<br><span class="th-sub">data_num</span></th>
                 <th>Chủ tài khoản<br><span class="th-sub">name_ac</span></th>
-                <th style="width:230px">Ngân hàng<br><span class="th-sub">data__code / data__bin</span></th>
-                <th style="width:44px"></th>
+                <th style="width:190px">Ngân hàng<br><span class="th-sub">data__code</span></th>
+                <th style="width:96px"></th>
               </tr>
             </thead>
             <tbody id="bankTableBody"></tbody>

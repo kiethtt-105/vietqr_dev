@@ -229,6 +229,14 @@ input::placeholder{color:var(--ink-faint);}
 .panel-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .count-badge{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
 
+/* Tab "Danh sách tài khoản": tách rời hàng tìm kiếm và hàng thao tác
+   để đỡ dồn cục nhiều nút cạnh nhau, đỡ rối mắt. */
+.panel-head--accounts{flex-direction:column;align-items:stretch;gap:8px;}
+.panel-head-top{display:flex;align-items:center;gap:10px;}
+.panel-head-top .search-input{flex:1;min-width:0;}
+.panel-head--accounts .panel-head-actions{justify-content:flex-end;}
+.sort-hint{margin-bottom:10px;}
+
 /* ============ TABLE ============ */
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -244,15 +252,17 @@ tbody tr:hover{background:var(--panel-2);}
 td input{width:100%;background:transparent;border:1px solid transparent;border-radius:var(--radius-sm);padding:6px 7px;font-size:12.5px;color:var(--ink);}
 td input:hover{border-color:var(--border);}
 td input:focus{background:var(--bg);border-color:var(--accent);}
-.row-actions{display:flex;gap:6px;justify-content:flex-end;}
+.row-actions{display:flex;gap:4px;justify-content:flex-end;}
 .icon-btn{
   background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
   color:var(--ink-dim);width:26px;height:26px;cursor:pointer;font-size:12px;
   display:grid;place-items:center;
 }
 .icon-btn:hover{border-color:var(--danger);color:var(--danger);}
+.icon-btn.order-btn{font-size:10px;color:var(--ink-faint);}
+.icon-btn.order-btn:hover{border-color:var(--accent);color:var(--accent-bright);}
+.icon-btn.order-btn:disabled{opacity:.3;cursor:default;pointer-events:none;}
 .bank-select{width:100%;}
-.bank-meta{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:2px;}
 .stt-cell{font-family:var(--mono);color:var(--ink-faint);text-align:center;width:38px;}
 
 /* ============ QR TAB ============ */
@@ -477,7 +487,8 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
   }
   #bankTable td:nth-child(2), #bankTable td:nth-child(5){grid-column:1 / -1;}
   #bankTable td.row-actions{
-    position:absolute;top:10px;right:10px;grid-column:auto;
+    grid-column:1 / -1;justify-content:flex-end;
+    margin-top:4px;padding-top:8px;border-top:1px solid var(--border);
   }
   #bankTable td input, #bankTable td select{width:100%;}
   .panel-head-actions{width:100%;}
@@ -511,4 +522,4 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .qr-only .pages{padding:0;}
 .qr-only .qr-layout{display:flex;justify-content:center;align-items:flex-start;min-height:auto;}
 .qr-only .qr-result-wrap{width:100%;max-width:420px;padding:24px 20px;}
-.qr-only .qr-card{margin:0;} A
+.qr-only .qr-card{margin:0;} 
