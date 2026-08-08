@@ -1,6 +1,18 @@
 [
-  { "value": "compact2", "label": "Compact 2" },
-  { "value": "compact", "label": "Compact" },
-  { "value": "print", "label": "Print" },
-  { "value": "qr_only", "label": "Chỉ mã QR" }
+  {
+    "value": "compact2",
+    "label": "Compact 2"
+  },
+  {
+    "value": "compact",
+    "label": "Compact"
+  },
+  {
+    "value": "print",
+    "label": "Print"
+  },
+  {
+    "value": "qr_only",
+    "label": "Qr_only"
+  }
 ]
