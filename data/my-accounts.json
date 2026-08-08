@@ -41,7 +41,7 @@
   {
     "data__id": 45,
     "list_name": "VIB",
-    "data_num": "064933000",
+    "data_num": "052004",
     "name_ac": "Huynh Tran Tuan Kiet",
     "data__name": "VIB",
     "data__code": "VIB",
@@ -65,21 +65,8 @@
     "stt": 5
   },
   {
-    "data__id": 21,
-    "list_name": "MB",
-    "data_num": "4610052004",
-    "name_ac": "Huynh Tran Tuan Kiet",
-    "data__name": "MBBank",
-    "data__code": "MB",
-    "data__bin": "970422",
-    "data__shortName": "MBBank",
-    "data__logo": "https://cdn.vietqr.io/img/MB.png",
-    "data__short_name": "MBBank",
-    "stt": 6
-  },
-  {
     "data__id": 17,
-    "list_name": "PhanLe Duy Khoi",
+    "list_name": "Duy Khoi - ICB",
     "data_num": "105878043349",
     "name_ac": "Phan Le Duy Khoi",
     "data__name": "VietinBank",
@@ -88,7 +75,7 @@
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank",
-    "stt": 7
+    "stt": 6
   },
   {
     "data__id": 43,
@@ -101,7 +88,7 @@
     "data__shortName": "Vietcombank",
     "data__logo": "https://cdn.vietqr.io/img/VCB.png",
     "data__short_name": "Vietcombank",
-    "stt": 8
+    "stt": 7
   },
   {
     "data__id": 65,
@@ -114,7 +101,7 @@
     "data__shortName": "MoMo",
     "data__logo": "https://cdn.vietqr.io/img/momo.png",
     "data__short_name": "MoMo",
-    "stt": 9
+    "stt": 8
   },
   {
     "data__id": 17,
@@ -127,6 +114,6 @@
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank",
-    "stt": 10
+    "stt": 9
   }
 ]
