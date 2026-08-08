@@ -904,6 +904,28 @@ function findAccountByNickname(nick) {
   const n = String(nick).trim().toLowerCase();
   return state.accounts.find((a) => (a.list_name || "").trim().toLowerCase() === n) || null;
 }
+// Tìm tài khoản mà 1 mẫu chuyển tiền (preset) đang trỏ tới.
+// Ưu tiên khớp theo SỐ TÀI KHOẢN (accountNum) — không đổi dù người dùng đổi tên gợi nhớ sau này.
+// Nếu mẫu cũ chưa có accountNum (tạo trước khi có field này), fallback về khớp tên gợi nhớ,
+// rồi khớp gần đúng (tên cũ nằm trong tên hiện tại hoặc ngược lại) để vẫn dùng được sau khi đổi tên.
+function findAccountForPreset(preset) {
+  if (!preset) return null;
+  if (preset.accountNum) {
+    const byNum = state.accounts.find((a) => String(a.data_num || "").trim() === String(preset.accountNum).trim());
+    if (byNum) return byNum;
+  }
+  if (!preset.accountName) return null;
+  const nick = preset.accountName.trim().toLowerCase();
+  if (!nick) return null;
+  const exact = state.accounts.find((a) => (a.list_name || "").trim().toLowerCase() === nick);
+  if (exact) return exact;
+  return (
+    state.accounts.find((a) => {
+      const cur = (a.list_name || "").trim().toLowerCase();
+      return cur && (cur.includes(nick) || nick.includes(cur));
+    }) || null
+  );
+}
 function loadDefaults() {
   try {
     return JSON.parse(localStorage.getItem(LS_DEFAULTS) || "{}");
@@ -1032,13 +1054,21 @@ function updateMauActiveUi() {
     updateBtn.hidden = true;
   }
 }
+function clearActivePreset() {
+  if (state.selectedPresetIdx == null) return;
+  state.selectedPresetIdx = null;
+  renderMauList();
+  updateMauActiveUi();
+  saveFormState();
+  showToast("Đã bỏ chọn mẫu — số tiền/nội dung đang nhập không còn gắn với mẫu nào.", "ok");
+}
 function applyPresetToForm(preset) {
-  if (preset.accountName) {
-    const acc = findAccountByNickname(preset.accountName);
+  if (preset.accountName || preset.accountNum) {
+    const acc = findAccountForPreset(preset);
     if (acc) {
       $("#qrAccount").value = state.accounts.indexOf(acc);
-    } else {
-      showToast(`Không tìm thấy tài khoản "${preset.accountName}" cho mẫu này.`, "err");
+    } else if (preset.accountName) {
+      showToast(`Không tìm thấy tài khoản "${preset.accountName}" cho mẫu này — giữ nguyên tài khoản đang chọn.`, "err");
     }
   }
   if (preset.amount != null && preset.amount !== "") {
@@ -1061,6 +1091,9 @@ function selectMau(idx) {
   applyPresetToForm(preset);
   renderMauList();
   updateMauActiveUi();
+  // Nhảy luôn sang tab "Tạo giao dịch" để thấy mã QR vừa tạo — chọn mẫu xong không thấy
+  // gì vì QR nằm ở tab kia, phải tự bấm qua mới thấy, rất khó hiểu.
+  switchWorkspaceTab("qr");
   saveFormState();
 }
 function deleteMauPreset(idx) {
@@ -1103,6 +1136,7 @@ function saveCurrentFormAsPreset() {
   state.presets.push({
     name: trimmed,
     accountName: acc ? acc.list_name : "",
+    accountNum: acc ? acc.data_num : "",
     amount: Number(rawNumber($("#qrAmount").value)) || 0,
     content: $("#qrContent").value.trim(),
     template: $("#qrTemplate").value,
@@ -1122,6 +1156,7 @@ function updateSelectedPreset() {
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
   preset.accountName = acc ? acc.list_name : preset.accountName;
+  preset.accountNum = acc ? acc.data_num : preset.accountNum;
   preset.amount = Number(rawNumber($("#qrAmount").value)) || 0;
   preset.content = $("#qrContent").value.trim();
   preset.template = $("#qrTemplate").value;
@@ -1478,6 +1513,7 @@ async function init() {
   });
 
   $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
+  $("#btnClearActivePreset").addEventListener("click", clearActivePreset);
 
   $$("#quickAmounts .chip").forEach((chip) => {
     chip.addEventListener("click", () => {
