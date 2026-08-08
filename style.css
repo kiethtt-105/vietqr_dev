@@ -265,9 +265,31 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .bank-select{width:100%;}
 .stt-cell{font-family:var(--mono);color:var(--ink-faint);text-align:center;width:38px;}
 
-/* ============ WORKSPACE: Mẫu giao dịch | Tạo giao dịch ============ */
-.workspace{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start;}
-.mau-panel{background:var(--bg);}
+/* ============ Ô TÌM/LỌC NGÂN HÀNG (thay cho select thường, dropdown dài khó tìm) ============ */
+.bank-input{width:100%;cursor:pointer;font-family:var(--body);}
+.bank-input:focus{cursor:text;}
+.bank-picker-popup{
+  position:fixed;z-index:70;max-height:260px;overflow-y:auto;
+  background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);padding:4px;
+  box-shadow:0 12px 32px rgba(0,0,0,.45);
+}
+.bank-picker-list{display:flex;flex-direction:column;gap:1px;}
+.bank-picker-item{
+  display:flex;align-items:baseline;gap:6px;
+  width:100%;text-align:left;background:transparent;border:none;
+  color:var(--ink);font-family:var(--body);font-size:12.5px;
+  padding:8px 9px;border-radius:5px;cursor:pointer;
+}
+.bank-picker-item:hover,.bank-picker-item.active{background:var(--accent-wash);color:var(--accent-bright);}
+.bank-picker-code{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);}
+.bank-picker-item:hover .bank-picker-code,.bank-picker-item.active .bank-picker-code{color:var(--accent-bright);}
+.bank-picker-empty{padding:14px 10px;font-size:12px;color:var(--ink-faint);text-align:center;}
+
+/* ============ WORKSPACE: 2 tab Tạo giao dịch | Mẫu giao dịch ============ */
+.workspace-tabs{margin-bottom:16px;}
+.workspace{display:block;}
+.mau-panel{background:var(--bg);max-width:640px;margin:0 auto;}
 .mau-panel .panel-head{margin-bottom:6px;}
 .mau-panel .panel-head h2{font-size:13px;}
 .mau-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;margin:10px 0 12px;padding-right:2px;}
@@ -495,7 +517,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 @keyframes toast-out{to{opacity:0;transform:translateX(24px);}}
 
 @media (max-width:900px){
-  .workspace{grid-template-columns:1fr;}
   .mau-list{max-height:280px;}
 }
 @media (max-width:760px){
@@ -549,5 +570,4 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
   .qr-form .btn.full{padding:13px;font-size:14.5px;margin-top:4px;}
   .qr-card,.qr-actions{max-width:400px;}
   .qr-empty{min-height:420px;font-size:13.5px;}
-  .workspace{grid-template-columns:320px 1fr;}
 }

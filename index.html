@@ -152,22 +152,26 @@
     </section>
   </div>
 
-  <!-- ===== TẠO GIAO DỊCH — 2 cửa sổ: Mẫu giao dịch | Tạo giao dịch ===== -->
+  <!-- ===== TẠO GIAO DỊCH — 2 TAB: Tạo giao dịch | Mẫu giao dịch ===== -->
+  <nav class="tabs workspace-tabs">
+    <button class="tab active" type="button" data-workspace-tab="qr">Tạo giao dịch</button>
+    <button class="tab" type="button" data-workspace-tab="mau">Mẫu giao dịch</button>
+  </nav>
   <div class="workspace">
 
-    <!-- ---- CỬA SỔ 1: MẪU GIAO DỊCH ---- -->
-    <section class="panel mau-panel" id="tab-mau">
+    <!-- ---- TAB: MẪU GIAO DỊCH ---- -->
+    <section class="panel mau-panel" id="tab-mau" hidden>
       <div class="panel-head">
         <h2>Mẫu giao dịch</h2>
         <span class="count-badge" id="mauCount">0 mẫu</span>
       </div>
-      <p class="hint inline-hint">Bấm 1 mẫu để nạp vào form bên phải. Sửa xong bấm "Cập nhật mẫu" để lưu lại.</p>
+      <p class="hint inline-hint">Bấm 1 mẫu để nạp vào form ở tab "Tạo giao dịch". Sửa xong bấm "Cập nhật mẫu" để lưu lại.</p>
       <div class="mau-list" id="mauList"></div>
-      <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — điền form bên phải rồi bấm "💾 Lưu mẫu mới".</p>
+      <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — sang tab "Tạo giao dịch", điền form rồi bấm "💾 Lưu mẫu mới".</p>
       <button class="btn subtle full" id="btnSaveMauGithub" type="button">Lưu mẫu lên GitHub</button>
     </section>
 
-    <!-- ---- CỬA SỔ 2: TẠO GIAO DỊCH ---- -->
+    <!-- ---- TAB: TẠO GIAO DỊCH ---- -->
     <section class="panel" id="tab-qr">
       <div class="qr-layout">
 
@@ -270,6 +274,11 @@
 </div>
 
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+<!-- Popup tìm/lọc ngân hàng dùng chung cho mọi dòng trong bảng tài khoản -->
+<div class="bank-picker-popup" id="bankPickerPopup" hidden>
+  <div class="bank-picker-list" id="bankPickerList"></div>
+</div>
 
 <script src="app.js"></script>
 </body>

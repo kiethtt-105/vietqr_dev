@@ -397,11 +397,53 @@ async function loadAllFromGithub() {
   }
 }
 
+// Tự động kéo dữ liệu mới nhất từ GitHub ngay khi mở app (nếu đã cấu hình kết nối) —
+// không cần bấm nút "Tải dữ liệu từ GitHub" thủ công mỗi lần. Chạy ngầm, lỗi thì bỏ qua
+// trong im lặng (vẫn còn dữ liệu cache cục bộ để dùng), không làm phiền lúc mới mở app.
+async function syncFromGithubSilently() {
+  if (!state.gh.owner || !state.gh.repo || !getToken()) return;
+  try {
+    let changed = false;
+    const acc = await ghReadJson(state.gh.pathAccounts);
+    if (acc.data) {
+      state.accounts = acc.data;
+      state.sha.accounts = acc.sha;
+      sortAccountsByStt();
+      localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
+      changed = true;
+    }
+    const presets = await ghReadJson(state.gh.pathPresets);
+    if (presets.data) {
+      state.presets = presets.data;
+      state.sha.presets = presets.sha;
+      savePresetsCache();
+      changed = true;
+    }
+    if (changed) {
+      renderTable();
+      populateQrAccounts();
+      renderMauList();
+      updateMauActiveUi();
+      onGenerateQr(null, { silent: true });
+    }
+    $("#ghDot").className = "dot on";
+  } catch (err) {
+    console.error("Tự động đồng bộ GitHub lỗi:", err);
+  }
+}
+
 async function saveAccountsToGithub() {
   if (!state.gh.owner || !state.gh.repo) {
     setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
     openSettingsModal("github");
     return;
+  }
+  if (!state.accounts.length) {
+    const ok = await showConfirm(
+      "Danh sách tài khoản đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu tài khoản đang có trên GitHub. Vẫn tiếp tục?",
+      "Vẫn lưu (xoá hết)"
+    );
+    if (!ok) return;
   }
   const invalidRows = [];
   state.accounts.forEach((acc, i) => {
@@ -448,6 +490,13 @@ async function savePresetsToGithub() {
     setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
     openSettingsModal("github");
     return;
+  }
+  if (!state.presets.length) {
+    const ok = await showConfirm(
+      "Danh sách mẫu chuyển tiền đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ mẫu đang có trên GitHub. Vẫn tiếp tục?",
+      "Vẫn lưu (xoá hết)"
+    );
+    if (!ok) return;
   }
   const emptyRows = state.presets
     .map((p, i) => (!p.name || !p.name.trim() ? i + 1 : null))
@@ -565,13 +614,79 @@ async function refreshRefBanksFromVietQR() {
     }, 2500);
   }
 }
-function bankOptionsHtml(selectedCode) {
-  return state.refBanks
+function bankLabelForRow(acc) {
+  if (!acc || !acc.data__code) return "";
+  return `${acc.data__name || acc.data__shortName || ""} — ${acc.data__code}`;
+}
+
+// ---------- Popup tìm/lọc ngân hàng (thay cho <select> dài, khó tìm khi có nhiều ngân hàng) ----------
+let bankPickerOpenIdx = null;
+function closeBankPicker() {
+  const popup = $("#bankPickerPopup");
+  if (popup) popup.hidden = true;
+  bankPickerOpenIdx = null;
+}
+function positionBankPicker(inputEl) {
+  const popup = $("#bankPickerPopup");
+  const rect = inputEl.getBoundingClientRect();
+  const maxHeight = 260;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const openUp = spaceBelow < maxHeight && rect.top > spaceBelow;
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8));
+  popup.style.left = `${left}px`;
+  popup.style.width = `${rect.width}px`;
+  if (openUp) {
+    popup.style.top = "";
+    popup.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+  } else {
+    popup.style.bottom = "";
+    popup.style.top = `${rect.bottom + 4}px`;
+  }
+}
+function renderBankPickerList(idx, query) {
+  const list = $("#bankPickerList");
+  if (!list) return;
+  const q = String(query || "").trim().toLowerCase();
+  const items = !q
+    ? state.refBanks
+    : state.refBanks.filter((b) => `${b.shortName || ""} ${b.name || ""} ${b.code || ""}`.toLowerCase().includes(q));
+
+  if (!items.length) {
+    list.innerHTML = `<div class="bank-picker-empty">Không tìm thấy ngân hàng phù hợp</div>`;
+    return;
+  }
+  list.innerHTML = items
     .map(
       (b) =>
-        `<option value="${escapeAttr(b.code)}" ${b.code === selectedCode ? "selected" : ""}>${escapeHtml(b.shortName)} — ${escapeHtml(b.code)}</option>`
+        `<button type="button" class="bank-picker-item" data-code="${escapeAttr(b.code)}">${escapeHtml(b.shortName)} <span class="bank-picker-code">— ${escapeHtml(b.code)}</span></button>`
     )
     .join("");
+  list.querySelectorAll("[data-code]").forEach((btn) => {
+    // mousedown (không phải click) để chạy trước sự kiện blur của ô input
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      selectBankForRow(idx, btn.dataset.code);
+    });
+  });
+}
+function selectBankForRow(idx, code) {
+  applyBankToRow(idx, code);
+  closeBankPicker();
+  renderTable();
+  populateQrAccounts();
+}
+function openBankPicker(idx, inputEl) {
+  bankPickerOpenIdx = idx;
+  const popup = $("#bankPickerPopup");
+  if (!popup) return;
+  if (!state.refBanks.length) {
+    showToast('Chưa có danh sách ngân hàng — bấm nút "⟳" để tải từ VietQR.', "err");
+    return;
+  }
+  popup.hidden = false;
+  positionBankPicker(inputEl);
+  inputEl.select();
+  renderBankPickerList(idx, "");
 }
 
 // ---------- Accounts table CRUD ----------
@@ -676,7 +791,8 @@ function renderTable() {
       <td data-label="Số tài khoản"><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}"></td>
       <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
       <td data-label="Ngân hàng">
-        <select class="bank-select" data-idx="${idx}">${bankOptionsHtml(acc.data__code)}</select>
+        <input type="text" class="bank-input" data-idx="${idx}" autocomplete="off"
+          placeholder="🔎 Tìm ngân hàng…" value="${escapeAttr(bankLabelForRow(acc))}">
       </td>
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-move="${idx}" data-dir="-1" ${!sortable || idx === 0 ? "disabled" : ""}>▲</button>
@@ -690,7 +806,7 @@ function renderTable() {
     setStatus($("#ghMsg"), "Chưa có danh sách ngân hàng — bấm \"Làm mới ngân hàng từ VietQR\".", "err");
   }
 
-  body.querySelectorAll("input").forEach((input) => {
+  body.querySelectorAll("input[data-field]").forEach((input) => {
     input.addEventListener("input", (e) => {
       const idx = Number(e.target.dataset.idx);
       const field = e.target.dataset.field;
@@ -698,12 +814,14 @@ function renderTable() {
       populateQrAccounts();
     });
   });
-  body.querySelectorAll("select.bank-select").forEach((sel) => {
-    sel.addEventListener("change", (e) => {
-      const idx = Number(e.target.dataset.idx);
-      applyBankToRow(idx, e.target.value);
-      renderTable();
-      populateQrAccounts();
+  body.querySelectorAll("input.bank-input").forEach((input) => {
+    input.addEventListener("focus", (e) => openBankPicker(Number(e.target.dataset.idx), e.target));
+    input.addEventListener("click", (e) => openBankPicker(Number(e.target.dataset.idx), e.target));
+    input.addEventListener("input", (e) => renderBankPickerList(Number(e.target.dataset.idx), e.target.value));
+    input.addEventListener("blur", (e) => {
+      // gõ tìm rồi bấm ra ngoài mà không chọn -> khôi phục lại đúng tên ngân hàng đang lưu
+      const i = Number(e.target.dataset.idx);
+      e.target.value = bankLabelForRow(state.accounts[i]);
     });
   });
   body.querySelectorAll("[data-move]").forEach((btn) => {
@@ -1189,6 +1307,14 @@ function onGenerateQr(e, opts) {
   saveFormState();
 }
 
+// ---------- Workspace tabs (Tạo giao dịch / Mẫu giao dịch) ----------
+function switchWorkspaceTab(tabName) {
+  $$(".workspace-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.workspaceTab === tabName));
+  $("#tab-qr").hidden = tabName !== "qr";
+  $("#tab-mau").hidden = tabName !== "mau";
+  if (tabName === "mau") renderMauList();
+}
+
 // ---------- Settings modal (danh sách tài khoản + kết nối GitHub) ----------
 function switchSettingsTab(tabName) {
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
@@ -1266,10 +1392,35 @@ async function init() {
     tab.addEventListener("click", () => switchSettingsTab(tab.dataset.settingsTab));
   });
 
+  $$(".workspace-tabs .tab").forEach((tab) => {
+    tab.addEventListener("click", () => switchWorkspaceTab(tab.dataset.workspaceTab));
+  });
+
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (!$("#confirmBackdrop").hidden) return; // để confirm dialog tự xử lý Escape của riêng nó
+    if (!$("#bankPickerPopup").hidden) {
+      closeBankPicker();
+      return;
+    }
     if (!$("#settingsBackdrop").hidden) closeSettingsModal();
+  });
+
+  // Đóng popup tìm ngân hàng khi bấm ra ngoài / cuộn / đổi kích thước cửa sổ
+  document.addEventListener("mousedown", (e) => {
+    if (bankPickerOpenIdx == null) return;
+    if (e.target.closest("#bankPickerPopup") || e.target.closest(".bank-input")) return;
+    closeBankPicker();
+  });
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (bankPickerOpenIdx != null) closeBankPicker();
+    },
+    true
+  );
+  window.addEventListener("resize", () => {
+    if (bankPickerOpenIdx != null) closeBankPicker();
   });
   $("#btnToggleTokenVisibility").addEventListener("click", () => {
     const input = $("#ghToken");
@@ -1367,7 +1518,11 @@ async function init() {
   restoreFormState();
   updateContentCounter($("#qrContent").value.trim());
   updateMauActiveUi();
+  switchWorkspaceTab("qr");
   onGenerateQr(null, { silent: true });
+
+  // Đồng bộ ngầm từ GitHub (nếu đã kết nối) — không chặn giao diện, không cần bấm nút thủ công
+  syncFromGithubSilently();
 }
 
 document.addEventListener("DOMContentLoaded", init);
