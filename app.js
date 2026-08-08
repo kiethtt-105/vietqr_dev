@@ -7,12 +7,12 @@
 // Mẫu hiển thị QR (compact2/compact/print/qr_only) là dữ liệu tĩnh khai báo
 // ngay trong file này (QR_DISPLAY_TEMPLATES), không cần file riêng.
 //
-// Link API — 3 kiểu gọi:
-//   1) ?amount=..&addInfo=..                -> dùng tài khoản MẶC ĐỊNH, trả thẳng ảnh QR
-//   2) ?bank=<tên gợi nhớ>&amount=..&addInfo=.. -> tìm tài khoản theo "tên gợi nhớ" (list_name)
-//   3) ?bank=<mã NH>&stk=<số TK>&amount=..&content=..&redirect=1 -> kiểu cũ, chỉ định thẳng
-//   (addInfo và content là 2 tên tương đương cho nội dung chuyển khoản)
-//   Thêm &format=text để trang chỉ in ra link ảnh thay vì chuyển thẳng tới ảnh.
+// Giao diện tách 2 cửa sổ:
+//   - "Mẫu giao dịch": danh sách mẫu chuyển tiền, bấm để nạp vào form.
+//   - "Tạo giao dịch": form tạo mã QR (tài khoản/số tiền/nội dung/mẫu hiển thị).
+// Toàn bộ thông tin đang nhập ở form (tài khoản, số tiền, nội dung, mẫu hiển
+// thị, mẫu giao dịch đang chọn) được lưu vào localStorage sau mỗi lần thay
+// đổi -> mở lại / F5 không bị mất. Nút "Xoá thông tin" xoá dữ liệu đã lưu này.
 // ============================================================
 
 const LS_GH_CONFIG = "vietqr_gh_config";
@@ -20,6 +20,7 @@ const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
 const LS_PRESETS_CACHE = "vietqr_presets_cache";
 const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
+const LS_FORM_STATE = "vietqr_form_state"; // { accountIdx, amount, content, template, selectedPresetIdx }
 const LS_REFBANKS_CACHE = "vietqr_refbanks_cache"; // { data, fetchedAt }
 const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000; // 12 giờ — tránh gọi API VietQR mỗi lần mở app
 
@@ -68,6 +69,7 @@ let state = {
   refBanks: [],
   accounts: [],
   presets: [],
+  selectedPresetIdx: null, // mẫu giao dịch đang được nạp vào form (null = không có)
   sha: { accounts: null, presets: null },
   gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json", pathPresets: "data/mau-chuyen-tien.json" },
 };
@@ -385,8 +387,7 @@ async function loadAllFromGithub() {
     }
     renderTable();
     populateQrAccounts();
-    populateQrPresets();
-    renderPresetsTable();
+    renderMauList();
     setStatus($("#ghMsg"), `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền.`, "ok");
     $("#ghDot").className = "dot on";
   } catch (err) {
@@ -452,12 +453,10 @@ async function savePresetsToGithub() {
     .map((p, i) => (!p.name || !p.name.trim() ? i + 1 : null))
     .filter((n) => n != null);
   if (emptyRows.length) {
-    setStatus($("#ghMsg"), `Mẫu ở dòng ${emptyRows.join(", ")} chưa có tên — điền hoặc xoá trước khi lưu.`, "err");
-    showToast("Còn mẫu chuyển tiền chưa đặt tên", "err");
-    openSettingsModal("presets");
+    showToast(`Mẫu ở dòng ${emptyRows.join(", ")} chưa có tên — điền hoặc xoá trước khi lưu.`, "err");
     return;
   }
-  const btn = $("#btnSavePresetsGithub");
+  const btn = $("#btnSaveMauGithub");
   btn.classList.add("is-loading");
   btn.disabled = true;
   setStatus($("#ghMsg"), "Đang lưu mẫu chuyển tiền lên GitHub…");
@@ -513,8 +512,6 @@ async function fetchRefBanksFromApi() {
 }
 async function loadRefBanks() {
   // Ưu tiên file cục bộ trong repo, nếu chưa có / lỗi thì lấy thẳng từ API VietQR
-  // (đây là nguyên nhân chính khiến "+ Thêm dòng" trước đó như không hoạt động:
-  //  dropdown ngân hàng bị rỗng vì data/vietqr-banks.json chưa tồn tại)
   try {
     const res = await fetch("data/vietqr-banks.json");
     if (!res.ok) throw new Error("no local file");
@@ -527,8 +524,6 @@ async function loadRefBanks() {
   } catch (e) {
     /* rơi xuống lấy từ cache/API */
   }
-  // Cache theo timestamp: chỉ gọi API VietQR nếu chưa có cache hoặc cache đã quá TTL,
-  // tránh việc mỗi lần mở app đều gọi lại API bên ngoài.
   const cached = readRefBanksCache();
   if (cached && Date.now() - cached.fetchedAt < REFBANKS_TTL_MS) {
     state.refBanks = cached.data;
@@ -543,7 +538,6 @@ async function loadRefBanks() {
     }
     throw new Error("empty api response");
   } catch (e2) {
-    // API lỗi/hết hạn mức -> vẫn dùng cache cũ nếu có, còn hơn danh sách rỗng
     state.refBanks = cached ? cached.data : [];
   }
 }
@@ -572,8 +566,6 @@ async function refreshRefBanksFromVietQR() {
   }
 }
 function bankOptionsHtml(selectedCode) {
-  // b.code/b.shortName đến từ API VietQR (hoặc data/vietqr-banks.json) — dữ liệu ngoài,
-  // không nên tin tuyệt đối, luôn escape trước khi ghép vào innerHTML.
   return state.refBanks
     .map(
       (b) =>
@@ -605,18 +597,6 @@ async function loadAccountsInitial() {
     state.accounts = [];
   }
   sortAccountsByStt();
-}
-// Dùng cho đường API nhanh (redirect thẳng): chỉ đọc cache / fetch nhẹ, không đụng DOM
-async function ensureAccountsLoaded() {
-  if (state.accounts.length) return;
-  loadAccountsCache();
-  if (state.accounts.length) return;
-  try {
-    const res = await fetch("data/my-accounts.json");
-    if (res.ok) state.accounts = await res.json();
-  } catch (e) {
-    state.accounts = [];
-  }
 }
 
 // ---------- Presets (mẫu chuyển tiền) cache + load ----------
@@ -655,8 +635,6 @@ function applyBankToRow(idx, bankCode) {
   row.data__short_name = bank.short_name;
 }
 // ---------- Thứ tự hiển thị (STT) ----------
-// STT được lưu thẳng vào từng bản ghi (field "stt", tăng dần từ 1) để thứ tự
-// hiển thị không phụ thuộc vào thứ tự phần tử trong mảng khi đọc/ghi JSON.
 function renumberAccountsStt() {
   state.accounts.forEach((a, i) => {
     a.stt = i + 1;
@@ -682,7 +660,7 @@ function moveAccountRow(idx, dir) {
 function renderTable() {
   const body = $("#bankTableBody");
   const q = ($("#accountSearch")?.value || "").trim().toLowerCase();
-  const sortable = !q; // sắp xếp thủ công chỉ khả dụng khi không đang lọc, tránh nhầm vị trí
+  const sortable = !q;
   body.innerHTML = "";
   let shown = 0;
   state.accounts.forEach((acc, idx) => {
@@ -744,7 +722,6 @@ function renderTable() {
       renumberAccountsStt();
       renderTable();
       populateQrAccounts();
-      // Xoá ngay + cho Hoàn tác trong 5s, thay vì chặn bằng confirm dialog mỗi lần
       showToast(`Đã xoá "${name}"`, "ok", {
         duration: 5000,
         actionLabel: "Hoàn tác",
@@ -762,7 +739,6 @@ function renderTable() {
 }
 async function addRow() {
   const btn = $("#btnAddRow");
-  // Nếu chưa có danh sách ngân hàng thì tự tải trước, tránh dòng mới bị kẹt "không có ngân hàng để chọn"
   if (!state.refBanks.length) {
     const original = btn.textContent;
     btn.disabled = true;
@@ -822,19 +798,51 @@ function setDefaultAccount() {
   localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
   flashLinkBtn("#btnSetDefaultAccount", "★ Đã đặt mặc định");
 }
-// Khi người dùng tự tay đổi tài khoản/số tiền/nội dung/mẫu hiển thị sau khi đã
-// áp dụng 1 mẫu chuyển tiền, bỏ chọn mẫu đó đi -- tránh trường hợp dropdown "Mẫu
-// chuyển tiền" vẫn hiển thị tên mẫu cũ trong khi nội dung form đã không còn khớp
-// với mẫu đó nữa (dễ gây hiểu lầm là mẫu vẫn đang được áp dụng).
-function clearPresetSelection() {
-  const sel = $("#qrPreset");
-  if (sel && sel.value !== "") sel.value = "";
-}
 function flashLinkBtn(sel, text) {
   const btn = $(sel);
   const original = btn.textContent;
   btn.textContent = text;
   setTimeout(() => (btn.textContent = original), 1600);
+}
+
+// ---------- Lưu / khôi phục trạng thái form (sống sót qua F5) ----------
+function saveFormState() {
+  try {
+    localStorage.setItem(
+      LS_FORM_STATE,
+      JSON.stringify({
+        accountIdx: Number($("#qrAccount").value) || 0,
+        amount: rawNumber($("#qrAmount").value),
+        content: $("#qrContent").value,
+        template: $("#qrTemplate").value,
+        selectedPresetIdx: state.selectedPresetIdx,
+      })
+    );
+  } catch (e) {}
+}
+function loadFormStateRaw() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_FORM_STATE) || "null");
+  } catch (e) {
+    return null;
+  }
+}
+function clearFormState() {
+  localStorage.removeItem(LS_FORM_STATE);
+}
+function restoreFormState() {
+  const s = loadFormStateRaw();
+  if (!s) return false;
+  if (s.accountIdx != null && s.accountIdx < state.accounts.length) $("#qrAccount").value = s.accountIdx;
+  if (s.template) $("#qrTemplate").value = s.template;
+  if (s.amount) $("#qrAmount").value = formatNumber(s.amount);
+  if (s.content != null) {
+    $("#qrContent").value = s.content;
+  }
+  if (s.selectedPresetIdx != null && state.presets[s.selectedPresetIdx]) {
+    state.selectedPresetIdx = s.selectedPresetIdx;
+  }
+  return true;
 }
 
 // ---------- QR tab ----------
@@ -844,21 +852,57 @@ function populateQrTemplateOptions() {
   sel.innerHTML = QR_DISPLAY_TEMPLATES.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
   if (prev) sel.value = prev;
 }
-function populateQrPresets() {
-  const sel = $("#qrPreset");
-  if (!sel) return;
-  const prev = sel.value;
-  sel.innerHTML =
-    `<option value="">— Chọn mẫu (tuỳ chọn) —</option>` +
-    state.presets.map((p, i) => `<option value="${i}">${escapeHtml(p.name || `Mẫu ${i + 1}`)}</option>`).join("");
-  if (prev && Number(prev) < state.presets.length) sel.value = prev;
-}
-function applyTransferPreset() {
-  const sel = $("#qrPreset");
-  const idx = sel.value === "" ? -1 : Number(sel.value);
-  const preset = idx >= 0 ? state.presets[idx] : null;
-  if (!preset) return;
 
+// ---------- Mẫu giao dịch (cửa sổ riêng, tách khỏi form Tạo giao dịch) ----------
+function renderMauList() {
+  const wrap = $("#mauList");
+  const emptyHint = $("#mauEmptyHint");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (emptyHint) emptyHint.hidden = state.presets.length > 0;
+
+  state.presets.forEach((p, idx) => {
+    const amountText = p.amount ? formatNumber(p.amount) + "đ" : "—";
+    const accText = p.accountName ? escapeHtml(p.accountName) : "(giữ tài khoản hiện tại)";
+    const card = document.createElement("div");
+    card.className = "mau-card" + (state.selectedPresetIdx === idx ? " active" : "");
+    card.innerHTML = `
+      <button type="button" class="mau-card-body" data-select="${idx}">
+        <span class="mau-card-name">${escapeHtml(p.name || `Mẫu ${idx + 1}`)}</span>
+        <span class="mau-card-meta">${accText} · ${amountText}</span>
+        ${p.content ? `<span class="mau-card-content">${escapeHtml(p.content)}</span>` : ""}
+      </button>
+      <button type="button" class="icon-btn mau-card-del" title="Xoá mẫu" data-del="${idx}">✕</button>`;
+    wrap.appendChild(card);
+  });
+
+  $("#mauCount").textContent = `${state.presets.length} mẫu`;
+
+  wrap.querySelectorAll("[data-select]").forEach((btn) => {
+    btn.addEventListener("click", () => selectMau(Number(btn.dataset.select)));
+  });
+  wrap.querySelectorAll("[data-del]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteMauPreset(Number(btn.dataset.del));
+    });
+  });
+}
+function updateMauActiveUi() {
+  const tag = $("#mauActiveTag");
+  const nameEl = $("#mauActiveName");
+  const updateBtn = $("#btnUpdatePreset");
+  if (!tag || !nameEl || !updateBtn) return;
+  if (state.selectedPresetIdx != null && state.presets[state.selectedPresetIdx]) {
+    tag.hidden = false;
+    nameEl.textContent = state.presets[state.selectedPresetIdx].name || `Mẫu ${state.selectedPresetIdx + 1}`;
+    updateBtn.hidden = false;
+  } else {
+    tag.hidden = true;
+    updateBtn.hidden = true;
+  }
+}
+function applyPresetToForm(preset) {
   if (preset.accountName) {
     const acc = findAccountByNickname(preset.accountName);
     if (acc) {
@@ -880,8 +924,41 @@ function applyTransferPreset() {
   $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
   onGenerateQr(null, { silent: true });
 }
-// Lưu form hiện tại (tài khoản/số tiền/nội dung/mẫu hiển thị) thành 1 mẫu chuyển tiền mới.
-// Chỉ thêm mới được từ đây -- ở Cài đặt chỉ sửa/xoá.
+function selectMau(idx) {
+  const preset = state.presets[idx];
+  if (!preset) return;
+  state.selectedPresetIdx = idx;
+  applyPresetToForm(preset);
+  renderMauList();
+  updateMauActiveUi();
+  saveFormState();
+}
+function deleteMauPreset(idx) {
+  const removed = state.presets[idx];
+  const name = removed.name || `Mẫu ${idx + 1}`;
+  state.presets.splice(idx, 1);
+  if (state.selectedPresetIdx === idx) {
+    state.selectedPresetIdx = null;
+  } else if (state.selectedPresetIdx != null && state.selectedPresetIdx > idx) {
+    state.selectedPresetIdx -= 1;
+  }
+  savePresetsCache();
+  renderMauList();
+  updateMauActiveUi();
+  saveFormState();
+  showToast(`Đã xoá "${name}"`, "ok", {
+    duration: 5000,
+    actionLabel: "Hoàn tác",
+    onAction: () => {
+      const restoreAt = Math.min(idx, state.presets.length);
+      state.presets.splice(restoreAt, 0, removed);
+      savePresetsCache();
+      renderMauList();
+      showToast(`Đã khôi phục "${name}"`, "ok");
+    },
+  });
+}
+// Lưu form hiện tại thành 1 mẫu MỚI (không đụng tới mẫu đang chọn, nếu có).
 function saveCurrentFormAsPreset() {
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
@@ -901,72 +978,27 @@ function saveCurrentFormAsPreset() {
     template: $("#qrTemplate").value,
   });
   savePresetsCache();
-  populateQrPresets();
-  renderPresetsTable();
-  $("#qrPreset").value = String(state.presets.length - 1);
+  state.selectedPresetIdx = state.presets.length - 1;
+  renderMauList();
+  updateMauActiveUi();
+  saveFormState();
   showToast(`Đã lưu mẫu "${trimmed}"`, "ok");
 }
-// ---------- Bảng quản lý mẫu chuyển tiền trong Cài đặt (chỉ sửa/xoá) ----------
-function renderPresetsTable() {
-  const body = $("#presetTableBody");
-  if (!body) return;
-  body.innerHTML = "";
-  state.presets.forEach((p, idx) => {
-    const accountOptions =
-      `<option value="">— giữ tài khoản hiện tại —</option>` +
-      state.accounts
-        .map((a) => `<option value="${escapeAttr(a.list_name)}" ${a.list_name === p.accountName ? "selected" : ""}>${escapeHtml(a.list_name)}</option>`)
-        .join("");
-    const templateOptions = QR_DISPLAY_TEMPLATES.map(
-      (t) => `<option value="${escapeAttr(t.value)}" ${t.value === p.template ? "selected" : ""}>${escapeHtml(t.label)}</option>`
-    ).join("");
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Tên mẫu"><input data-idx="${idx}" data-field="name" value="${escapeAttr(p.name)}"></td>
-      <td data-label="Tài khoản"><select data-idx="${idx}" data-field="accountName">${accountOptions}</select></td>
-      <td data-label="Số tiền"><input data-idx="${idx}" data-field="amount" inputmode="numeric" value="${escapeAttr(formatNumber(p.amount || ""))}"></td>
-      <td data-label="Nội dung"><input data-idx="${idx}" data-field="content" value="${escapeAttr(p.content)}"></td>
-      <td data-label="Mẫu hiển thị"><select data-idx="${idx}" data-field="template">${templateOptions}</select></td>
-      <td class="row-actions"><button class="icon-btn" title="Xoá mẫu" data-del-preset="${idx}">✕</button></td>`;
-    body.appendChild(tr);
-  });
-  $("#presetRowCount").textContent = `${state.presets.length} mẫu`;
-
-  body.querySelectorAll("input").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      const idx = Number(e.target.dataset.idx);
-      const field = e.target.dataset.field;
-      if (field === "amount") {
-        e.target.value = formatNumber(e.target.value);
-        state.presets[idx][field] = Number(rawNumber(e.target.value)) || 0;
-      } else {
-        state.presets[idx][field] = e.target.value;
-      }
-      savePresetsCache();
-      populateQrPresets();
-    });
-  });
-  body.querySelectorAll("select").forEach((sel) => {
-    sel.addEventListener("change", (e) => {
-      const idx = Number(e.target.dataset.idx);
-      const field = e.target.dataset.field;
-      state.presets[idx][field] = e.target.value;
-      savePresetsCache();
-    });
-  });
-  body.querySelectorAll("[data-del-preset]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.delPreset);
-      const p = state.presets[idx];
-      const ok = await showConfirm(`Xoá mẫu "${p.name || idx + 1}"?`, "Xoá");
-      if (!ok) return;
-      state.presets.splice(idx, 1);
-      savePresetsCache();
-      renderPresetsTable();
-      populateQrPresets();
-    });
-  });
+// Ghi đè mẫu ĐANG CHỌN bằng nội dung form hiện tại.
+function updateSelectedPreset() {
+  if (state.selectedPresetIdx == null) return;
+  const preset = state.presets[state.selectedPresetIdx];
+  if (!preset) return;
+  const idx = Number($("#qrAccount").value);
+  const acc = state.accounts[idx];
+  preset.accountName = acc ? acc.list_name : preset.accountName;
+  preset.amount = Number(rawNumber($("#qrAmount").value)) || 0;
+  preset.content = $("#qrContent").value.trim();
+  preset.template = $("#qrTemplate").value;
+  savePresetsCache();
+  renderMauList();
+  updateMauActiveUi();
+  showToast(`Đã cập nhật mẫu "${preset.name}"`, "ok");
 }
 function populateQrAccounts() {
   const sel = $("#qrAccount");
@@ -1025,10 +1057,6 @@ function updateContentCounter(content) {
 }
 
 // ---------- Gợi ý số tiền theo con số đang gõ ----------
-// Ví dụ: gõ "5" -> gợi ý 5.000 / 50.000 / 500.000
-//        gõ "15" -> gợi ý 15.000 / 150.000 / 1.500.000
-//        gõ "121211" -> gợi ý 121.211.000 / 1.212.110.000 (nếu chưa vượt trần)
-// Không giới hạn số chữ số đang gõ — chỉ lọc bỏ các gợi ý vượt trần hợp lý (AMOUNT_SUGGEST_CAP).
 const AMOUNT_SUGGEST_MULTIPLIERS = [1000, 10000, 100000];
 const AMOUNT_SUGGEST_CAP = 1_000_000_000;
 function computeAmountSuggestions(rawAmount) {
@@ -1077,8 +1105,6 @@ function renderAmountSuggestions() {
 }
 
 // ---------- Gợi ý nội dung chuyển khoản: combobox ----------
-// #qrContent luôn gõ tự do bình thường. Nút mũi tên (▾) bật/tắt menu gợi ý bên dưới;
-// không bấm mũi tên thì không có gì hiện ra, không cản trở việc gõ tay.
 function renderContentSuggestions() {
   const wrap = $("#contentSuggestions");
   const toggle = $("#btnContentSuggestToggle");
@@ -1159,130 +1185,16 @@ function onGenerateQr(e, opts) {
   $("#btnDownload").href = url;
   $("#btnCopyLink").dataset.url = url;
 
-  const apiParams = new URLSearchParams();
-  apiParams.set("bank", acc.data__code);
-  apiParams.set("stk", acc.data_num);
-  if (amount) apiParams.set("amount", amount);
-  if (content) apiParams.set("content", content);
-  apiParams.set("template", template);
-  apiParams.set("redirect", "1");
-  const apiUrl = `${location.origin}${location.pathname}?${apiParams.toString()}`;
-  $("#btnCopyApiLink").dataset.url = apiUrl;
-
   restartAnimation($("#qrCard"));
-}
-
-// ---------- Link API ----------
-// resolveApiAccount quyết định dùng tài khoản nào dựa trên tham số URL:
-//  - bank + stk (đủ cả 2)      -> dùng thẳng như cũ, không tự redirect trừ khi có &redirect=1
-//  - bank (là tên gợi nhớ, không có stk) -> tra trong danh sách tài khoản theo list_name, tự redirect
-//  - không có bank/stk         -> dùng tài khoản mặc định (hoặc tài khoản đầu tiên), tự redirect
-function resolveApiAccount(params) {
-  const bankParam = (params.get("bank") || "").trim();
-  const stkParam = (params.get("stk") || "").trim();
-
-  if (bankParam && stkParam) {
-    const idx = state.accounts.findIndex((a) => a.data__code === bankParam && a.data_num === stkParam);
-    const acc = idx >= 0 ? state.accounts[idx] : null;
-    return {
-      bank: bankParam,
-      stk: stkParam,
-      name: params.get("name") || (acc ? acc.name_ac : ""),
-      idx,
-      auto: false,
-    };
-  }
-
-  if (bankParam && !stkParam) {
-    const acc = findAccountByNickname(bankParam);
-    if (acc) {
-      return { bank: acc.data__code, stk: acc.data_num, name: acc.name_ac, idx: state.accounts.indexOf(acc), auto: true };
-    }
-  }
-
-  const defaults = loadDefaults();
-  let acc = null;
-  if (defaults.accountKey) {
-    acc = state.accounts.find((a) => accountKey(a) === defaults.accountKey) || null;
-  }
-  if (!acc) acc = state.accounts[0] || null;
-  if (!acc) return null;
-  return { bank: acc.data__code, stk: acc.data_num, name: acc.name_ac, idx: state.accounts.indexOf(acc), auto: true };
-}
-
-async function handleApiParams() {
-  const params = new URLSearchParams(window.location.search);
-  const hasApiIntent =
-    params.has("bank") || params.has("stk") || params.has("amount") || params.has("content") || params.has("addInfo");
-  if (!hasApiIntent) return false;
-
-  await ensureAccountsLoaded();
-
-  const resolved = resolveApiAccount(params);
-  if (!resolved) return false; // chưa có tài khoản nào -> mở app bình thường để thêm tài khoản trước
-
-  const amount = rawNumber(params.get("amount") || "");
-  const content = params.get("content") || params.get("addInfo") || "";
-  const template = params.get("template") || loadDefaults().template || "compact2";
-  const url = buildQrUrlRaw(resolved.bank, resolved.stk, amount, content, template, resolved.name);
-
-  const wantsText = params.get("format") === "text";
-  const wantsRedirect = params.get("redirect") === "1";
-
-  if (wantsText) {
-    document.documentElement.innerHTML = "";
-    document.body = document.createElement("body");
-    document.body.style.cssText =
-      "margin:0;padding:16px;font-family:monospace;font-size:13px;background:#fff;color:#000;word-break:break-all;";
-    document.body.textContent = url;
-    document.title = "VietQR link";
-    return true;
-  }
-  if (wantsRedirect) {
-    window.location.replace(url);
-    return true;
-  }
-
-  // Không redirect/text -> mở giao diện đầy đủ như bình thường, chỉ điền sẵn (prefill) form rồi tạo QR
-  window.__apiPrefill = { bank: resolved.bank, stk: resolved.stk, amount, content, template, name: resolved.name, idx: resolved.idx };
-  return false;
-}
-function applyApiPrefill() {
-  const p = window.__apiPrefill;
-  if (!p) return;
-  let idx = p.idx != null && p.idx >= 0 ? p.idx : state.accounts.findIndex((a) => a.data__code === p.bank && a.data_num === p.stk);
-  if (idx < 0) {
-    state.accounts.push({
-      data__id: 0,
-      list_name: "Từ link",
-      data_num: p.stk,
-      name_ac: p.name || "",
-      data__name: p.bank,
-      data__code: p.bank,
-      data__bin: "",
-      data__shortName: p.bank,
-      data__logo: "",
-      data__short_name: p.bank,
-    });
-    renderTable();
-    populateQrAccounts();
-    idx = state.accounts.length - 1;
-  }
-  $("#qrAccount").value = idx;
-  $("#qrAmount").value = formatNumber(p.amount);
-  $("#qrContent").value = p.content;
-  if (p.template) $("#qrTemplate").value = p.template;
-  onGenerateQr(null);
+  saveFormState();
 }
 
 // ---------- Settings modal (danh sách tài khoản + kết nối GitHub) ----------
 function switchSettingsTab(tabName) {
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
-  $("#settingsTabPresets").hidden = tabName !== "presets";
   $("#settingsTabGithub").hidden = tabName !== "github";
   if (tabName === "accounts") renderTable();
-  if (tabName === "presets") renderPresetsTable();
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;
@@ -1309,11 +1221,27 @@ function initRippleEffect() {
   });
 }
 
+// ---------- Xoá thông tin đang nhập (giữ nguyên danh sách tài khoản/mẫu) ----------
+async function clearEnteredInfo() {
+  const ok = await showConfirm("Xoá số tiền, nội dung và mẫu đang chọn trên form? (không xoá danh sách tài khoản/mẫu)", "Xoá");
+  if (!ok) return;
+  state.selectedPresetIdx = null;
+  clearFormState();
+  $("#qrAmount").value = "";
+  $("#qrContent").value = "";
+  updateContentCounter("");
+  $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+  applyDefaults();
+  renderMauList();
+  updateMauActiveUi();
+  $("#qrCard").hidden = true;
+  $("#qrEmpty").hidden = false;
+  $("#qrActions").hidden = true;
+  showToast("Đã xoá thông tin đang nhập", "ok");
+}
+
 // ---------- Init ----------
 async function init() {
-  const handled = await handleApiParams();
-  if (handled) return; // đã redirect hoặc in ra text, không cần dựng UI
-
   loadGhConfigFromStorage();
   initRippleEffect();
 
@@ -1326,8 +1254,7 @@ async function init() {
   renderTable();
   populateQrTemplateOptions();
   populateQrAccounts();
-  populateQrPresets();
-  renderPresetsTable();
+  renderMauList();
   renderContentSuggestions();
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
@@ -1368,11 +1295,13 @@ async function init() {
     localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
     await saveAccountsToGithub();
   });
-  $("#btnSavePresetsGithub").addEventListener("click", async () => {
+  $("#btnSaveMauGithub").addEventListener("click", async () => {
     savePresetsCache();
     await savePresetsToGithub();
   });
   $("#btnSavePreset").addEventListener("click", saveCurrentFormAsPreset);
+  $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
+  $("#btnClearForm").addEventListener("click", clearEnteredInfo);
 
   $("#btnContentSuggestToggle").addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1392,7 +1321,6 @@ async function init() {
       $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
       chip.classList.add("active");
       $("#qrAmount").value = formatNumber(chip.dataset.val);
-      clearPresetSelection();
       onGenerateQr(null, { silent: true });
     });
   });
@@ -1413,21 +1341,16 @@ async function init() {
 
   const liveGenerate = debounce(() => onGenerateQr(null, { silent: true }), 350);
   $("#qrAccount").addEventListener("change", () => {
-    clearPresetSelection();
     onGenerateQr(null, { silent: true });
   });
   $("#qrTemplate").addEventListener("change", () => {
-    clearPresetSelection();
     onGenerateQr(null, { silent: true });
   });
-  $("#qrPreset").addEventListener("change", applyTransferPreset);
   $("#qrAmount").addEventListener("input", () => {
-    clearPresetSelection();
     liveGenerate();
   });
   $("#qrContent").addEventListener("input", (e) => {
     updateContentCounter(e.target.value.trim()); // phản hồi tức thì, không chờ debounce
-    clearPresetSelection();
     liveGenerate();
   });
   $("#btnCopyLink").addEventListener("click", async (e) => {
@@ -1438,25 +1361,13 @@ async function init() {
     showToast("Đã sao chép link ảnh", "ok");
     setTimeout(() => (e.target.textContent = "Sao chép link ảnh"), 1500);
   });
-  $("#btnCopyApiLink").addEventListener("click", async (e) => {
-    const url = e.target.dataset.url;
-    if (!url) {
-      alert("Tạo mã QR trước đã, rồi mới sao chép link API.");
-      return;
-    }
-    await navigator.clipboard.writeText(url);
-    e.target.textContent = "Đã sao chép ✓";
-    showToast("Đã sao chép link API", "ok");
-    setTimeout(() => (e.target.textContent = "Sao chép link API"), 1500);
-  });
 
   updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
-  if (window.__apiPrefill) {
-    applyApiPrefill();
-  } else {
-    onGenerateQr(null, { silent: true });
-  }
+  restoreFormState();
+  updateContentCounter($("#qrContent").value.trim());
+  updateMauActiveUi();
+  onGenerateQr(null, { silent: true });
 }
 
 document.addEventListener("DOMContentLoaded", init);
