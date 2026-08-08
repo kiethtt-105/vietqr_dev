@@ -146,9 +146,22 @@ body{
   border-radius:var(--radius);padding:18px 20px 20px;
   box-shadow:0 20px 60px rgba(0,0,0,.5);
 }
-.gh-panel.settings-panel{max-width:900px;}
-.settings-tabs{margin-top:2px;}
-.settings-tab-panel{padding-top:14px;}
+/* Cửa sổ Cài đặt: chiều cao CỐ ĐỊNH bất kể đang ở tab nào, để chuyển tab
+   không làm khung nhảy/co giãn kích thước — mỗi tab chỉ cuộn nội dung riêng. */
+.gh-panel.settings-panel{
+  max-width:900px;
+  height:min(640px, 86vh);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.gh-panel.settings-panel .gh-panel-head{flex:none;}
+.settings-tabs{margin-top:2px;flex:none;}
+.settings-tab-panel{
+  padding-top:14px;padding-bottom:2px;
+  flex:1;min-height:0;overflow-y:auto;
+  display:flex;flex-direction:column;
+}
+.settings-tab-panel[hidden]{display:none;}
 .confirm-panel{max-width:340px;text-align:center;padding:22px 22px 20px;}
 .confirm-message{margin:0 0 16px;font-size:13.5px;color:var(--ink);line-height:1.5;}
 .confirm-actions{margin-top:0;justify-content:center;}
@@ -198,21 +211,37 @@ input::placeholder{color:var(--ink-faint);}
 .details-toggle summary:hover{color:var(--ink-dim);}
 .details-toggle .hint{margin-top:8px;}
 
-.tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);}
+/* Thanh tab dạng "segmented control": các tab luôn chia đều nhau trong một
+   khung bo tròn, thay vì các chữ rời rạc dài-ngắn khác nhau nằm trên 1 gạch
+   chân — nhìn cân đối và gọn hơn hẳn dù có 2 hay 4 tab. */
+.tabs{
+  display:flex;gap:3px;margin-bottom:16px;
+  background:var(--bg-2);border:1px solid var(--border);
+  border-radius:calc(var(--radius-sm) + 4px);padding:4px;
+}
 .tab{
-  position:relative;
-  font-family:var(--body);font-weight:600;font-size:12.5px;
-  background:transparent;border:none;color:var(--ink-faint);
-  padding:9px 14px 11px;cursor:pointer;
+  position:relative;flex:1 1 0;min-width:0;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-family:var(--body);font-weight:600;font-size:12px;
+  background:transparent;border:none;border-radius:var(--radius-sm);
+  color:var(--ink-faint);
+  padding:9px 10px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:color .15s ease, background .15s ease, box-shadow .15s ease;
 }
-.tab::after{
-  content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;
-  background:linear-gradient(90deg, var(--gold-bright), var(--accent-bright));
-  transform:scaleX(0);transition:transform .18s ease;
+.tab:hover{color:var(--ink-dim);}
+.tab.active{
+  color:#0A1A13;font-weight:700;
+  background:linear-gradient(150deg, var(--gold-bright) 0%, var(--accent-bright) 65%);
+  box-shadow:0 6px 16px rgba(0,0,0,.32);
 }
-.tab:hover{color:var(--ink);}
-.tab.active{color:var(--ink);}
-.tab.active::after{transform:scaleX(1);}
+
+.workspace-tabs{max-width:360px;}
+
+@media (max-width:640px){
+  .settings-tabs{flex-wrap:wrap;}
+  .settings-tabs .tab{flex:1 1 calc(50% - 3px);}
+}
 
 .panel{background:var(--bg);}
 .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
