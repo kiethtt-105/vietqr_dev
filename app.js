@@ -223,15 +223,24 @@ function loadGhConfigFromStorage() {
   $("#ghToken").value = localStorage.getItem(LS_GH_TOKEN) || "";
   updateGhStatusLabel();
 }
-function saveGhConfigToStorage() {
-  state.gh.owner = $("#ghOwner").value.trim();
-  state.gh.repo = $("#ghRepo").value.trim();
-  state.gh.branch = $("#ghBranch").value.trim() || "main";
-  state.gh.pathAccounts = $("#ghPathAccounts").value.trim() || "data/my-accounts.json";
-  state.gh.pathPresets = $("#ghPathPresets").value.trim() || "data/mau-chuyen-tien.json";
-  localStorage.setItem(LS_GH_CONFIG, JSON.stringify(state.gh));
+// Đồng bộ các ô nhập (owner/repo/branch/path/token) đang có trên form vào state.gh + localStorage.
+// Gọi hàm này ở ĐẦU mọi thao tác gọi API GitHub (tải/lưu), để không bắt buộc phải bấm
+// "Lưu thông tin kết nối" trước — tránh lỗi 401 do dùng token/owner/repo cũ còn sót lại
+// trong localStorage trong khi ô nhập đã gõ giá trị mới nhưng chưa lưu.
+function syncGhInputsToState() {
+  const owner = $("#ghOwner").value.trim();
+  const repo = $("#ghRepo").value.trim();
+  if (owner) state.gh.owner = owner;
+  if (repo) state.gh.repo = repo;
+  state.gh.branch = $("#ghBranch").value.trim() || state.gh.branch || "main";
+  state.gh.pathAccounts = $("#ghPathAccounts").value.trim() || state.gh.pathAccounts || "data/my-accounts.json";
+  state.gh.pathPresets = $("#ghPathPresets").value.trim() || state.gh.pathPresets || "data/mau-chuyen-tien.json";
   const token = $("#ghToken").value.trim();
   if (token) localStorage.setItem(LS_GH_TOKEN, token);
+  localStorage.setItem(LS_GH_CONFIG, JSON.stringify(state.gh));
+}
+function saveGhConfigToStorage() {
+  syncGhInputsToState();
   updateGhStatusLabel();
   setStatus($("#ghMsg"), "Đã lưu thông tin kết nối trên trình duyệt này.", "ok");
 }
@@ -366,6 +375,7 @@ async function ghWriteJson(path, data, sha, message) {
   }
 }
 async function loadAllFromGithub() {
+  syncGhInputsToState();
   if (!state.gh.owner || !state.gh.repo) {
     setStatus($("#ghMsg"), "Nhập owner/repo trước đã.", "err");
     return;
@@ -433,6 +443,7 @@ async function syncFromGithubSilently() {
 }
 
 async function saveAccountsToGithub() {
+  syncGhInputsToState();
   if (!state.gh.owner || !state.gh.repo) {
     setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
     openSettingsModal("github");
@@ -486,6 +497,7 @@ async function saveAccountsToGithub() {
 }
 
 async function savePresetsToGithub() {
+  syncGhInputsToState();
   if (!state.gh.owner || !state.gh.repo) {
     setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
     openSettingsModal("github");
