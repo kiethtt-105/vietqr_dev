@@ -15,7 +15,6 @@
 
 <div class="app">
 
-  <!-- ===== HEADER ===== -->
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">QR</span>
@@ -34,10 +33,8 @@
     </div>
   </header>
 
-  <!-- ===== NỘI DUNG ===== -->
   <div class="pages">
 
-  <!-- ===== CONFIRM DIALOG ===== -->
   <div class="modal-backdrop" id="confirmBackdrop" hidden>
     <section class="gh-panel confirm-panel" role="alertdialog" aria-modal="true" aria-label="Xác nhận">
       <p class="confirm-message" id="confirmMessage">Bạn có chắc chắn?</p>
@@ -48,7 +45,6 @@
     </section>
   </div>
 
-  <!-- ===== SETTINGS MODAL (chỉ còn: Tài khoản + GitHub) ===== -->
   <div class="modal-backdrop" id="settingsBackdrop" hidden>
     <section class="gh-panel settings-panel" id="settingsPanel" role="dialog" aria-label="Cài đặt">
       <div class="gh-panel-head">
@@ -61,7 +57,6 @@
         <button class="tab" type="button" data-settings-tab="github">Kết nối GitHub</button>
       </nav>
 
-      <!-- ---- TAB: DANH SÁCH TÀI KHOẢN ---- -->
       <div class="settings-tab-panel" id="settingsTabAccounts">
         <div class="panel-head panel-head--accounts">
           <div class="panel-head-top">
@@ -74,16 +69,15 @@
             <button class="btn primary" id="btnSaveGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
-        <p class="hint inline-hint sort-hint">Dùng ▲▼ để sắp xếp thứ tự hiển thị </p>
         <div class="table-wrap">
           <table id="bankTable">
             <thead>
               <tr>
                 <th style="width:38px">STT</th>
-                <th>Tên gợi nhớ<br><span class="th-sub">list_name</span></th>
-                <th>Số tài khoản<br><span class="th-sub">data_num</span></th>
-                <th>Chủ tài khoản<br><span class="th-sub">name_ac</span></th>
-                <th style="width:190px">Ngân hàng<br><span class="th-sub">data__code</span></th>
+                <th>Tên gợi nhớ</th>
+                <th>Số tài khoản</th>
+                <th>Chủ tài khoản</th>
+                <th style="width:190px">Ngân hàng</th>
                 <th style="width:96px"></th>
               </tr>
             </thead>
@@ -92,7 +86,6 @@
         </div>
       </div>
 
-      <!-- ---- TAB: KẾT NỐI GITHUB ---- -->
       <div class="settings-tab-panel" id="settingsTabGithub" hidden>
         <div class="gh-grid">
           <label>
@@ -113,13 +106,7 @@
               <button class="btn subtle" id="btnGhCheck" type="button">Kiểm tra kết nối</button>
               <span class="status inline" id="ghCheckMsg"></span>
             </div>
-            <p class="hint">
-              ⚠ Token được lưu <strong>dạng thô (plaintext)</strong> trong localStorage của trình duyệt này — bất kỳ
-              ai dùng chung máy/profile hoặc extension độc hại đọc được localStorage đều có thể lấy token.
-              Nên tạo <span class="mono">fine-grained personal access token</span> chỉ cấp quyền
-              <span class="mono">Contents: Read and write</span> cho đúng 1 repo này, đặt hạn dùng ngắn, và bấm
-              "Xoá token khỏi trình duyệt" khi dùng xong trên máy không phải của mình.
-            </p>
+            <p class="hint">⚠ Token lưu dạng plaintext trong trình duyệt này. Dùng fine-grained token, chỉ cấp quyền Contents: Read and write cho 1 repo, và xoá khi dùng xong trên máy lạ.</p>
           </label>
         </div>
 
@@ -152,26 +139,22 @@
     </section>
   </div>
 
-  <!-- ===== TẠO GIAO DỊCH — 2 TAB: Tạo giao dịch | Mẫu giao dịch ===== -->
   <nav class="tabs workspace-tabs">
     <button class="tab active" type="button" data-workspace-tab="qr">Tạo giao dịch</button>
     <button class="tab" type="button" data-workspace-tab="mau">Mẫu giao dịch</button>
   </nav>
   <div class="workspace">
 
-    <!-- ---- TAB: MẪU GIAO DỊCH ---- -->
     <section class="panel mau-panel" id="tab-mau" hidden>
       <div class="panel-head">
         <h2>Mẫu giao dịch</h2>
         <span class="count-badge" id="mauCount">0 mẫu</span>
       </div>
-      <p class="hint inline-hint">Bấm 1 mẫu để nạp vào form ở tab "Tạo giao dịch". Sửa xong bấm "Cập nhật mẫu" để lưu lại.</p>
       <div class="mau-list" id="mauList"></div>
       <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — sang tab "Tạo giao dịch", điền form rồi bấm "💾 Lưu mẫu mới".</p>
       <button class="btn subtle full" id="btnSaveMauGithub" type="button">Lưu mẫu lên GitHub</button>
     </section>
 
-    <!-- ---- TAB: TẠO GIAO DỊCH ---- -->
     <section class="panel" id="tab-qr">
       <div class="qr-layout">
 
@@ -267,9 +250,9 @@
 
     </section>
 
-  </div><!-- /.workspace -->
+  </div>
 
-  </div><!-- /.pages -->
+  </div>
 
   <footer class="footer">
     <span> Developed with ❤️ by tuankiet </span>
@@ -278,7 +261,6 @@
 
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
-<!-- Popup tìm/lọc ngân hàng dùng chung cho mọi dòng trong bảng tài khoản -->
 <div class="bank-picker-popup" id="bankPickerPopup" hidden>
   <div class="bank-picker-list" id="bankPickerList"></div>
 </div>

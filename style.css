@@ -1,8 +1,3 @@
-/* =========================================================
-   SỔ QUỸ — giao diện tối, kiểu bìa sổ tiết kiệm dập chữ xanh dương
-   Nền navy đậm, chữ ngà, viền/nút nhấn mạ xanh dương/indigo.
-   ========================================================= */
-
 :root{
   --bg:#0E121A;
   --bg-2:#0A0D13;
@@ -11,9 +6,9 @@
   --border:#262E3D;
   --border-strong:#3A4457;
 
-  --ink:#ECE7D8;          /* ngà, như chữ dập vàng trên bìa tối */
+  --ink:#ECE7D8;
   --ink-dim:#98A0B0;
-  --ink-faint:#7A8299; /* nhích sáng từ #5E6779 để đạt AA (~4.5:1) trên nền #0E121A */
+  --ink-faint:#7A8299;
 
   --accent:#4C7EF3;
   --accent-bright:#7FA6FF;
@@ -26,8 +21,8 @@
   --body:'Inter',sans-serif;
   --display:'Space Grotesk',sans-serif;
   --mono:'JetBrains Mono',monospace;
-  --radius:12px;      /* panel/card lớn: modal, qr-card, qr-empty */
-  --radius-sm:7px;     /* control nhỏ: nút, input, icon-btn */
+  --radius:12px;
+  --radius-sm:7px;
 }
 
 *{box-sizing:border-box;}
@@ -50,7 +45,6 @@ body{
 
 .app{max-width:1240px;margin:0 auto;min-height:100vh;background:transparent;}
 
-/* ============ HEADER ============ */
 .topbar{
   display:flex;align-items:center;justify-content:space-between;gap:14px;
   padding:15px 20px;border-bottom:1px solid var(--border);
@@ -87,10 +81,8 @@ body{
   white-space:nowrap;
 }
 
-/* ============ PAGES WRAPPER ============ */
 .pages{padding:18px 20px 10px;}
 
-/* ============ BUTTONS ============ */
 .btn{
   position:relative;overflow:hidden;
   font-family:var(--body);font-size:12.5px;font-weight:600;
@@ -107,7 +99,6 @@ body{
 .btn.danger{background:var(--danger);color:#fff;border-color:var(--danger);}
 .btn.danger:hover{background:#a5382f;border-color:#a5382f;}
 
-/* ============ RIPPLE ============ */
 .icon-btn{position:relative;overflow:hidden;}
 .ripple{
   position:absolute;border-radius:50%;pointer-events:none;
@@ -137,7 +128,6 @@ body{
 .dot.on{background:var(--ok);}
 .dot.err{background:var(--danger);}
 
-/* ============ MODAL ============ */
 .modal-backdrop{
   position:fixed;inset:0;z-index:60;
   background:rgba(0,0,0,.65);
@@ -177,8 +167,7 @@ input,select{
   background:var(--bg);border:1px solid var(--border);
   border-radius:var(--radius-sm);padding:8px 10px;color:var(--ink);
 }
-/* Nội dung chuyển khoản & tìm kiếm là text tiếng Việt tự do -> dùng --body,
-   font mono kéo dãn/kerning dấu tiếng Việt trông xấu và khó đọc hơn */
+
 #qrContent,.search-input{font-family:var(--body);}
 input:hover,select:hover{border-color:var(--border-strong);}
 input:focus,select:focus{border-color:var(--accent);}
@@ -191,7 +180,6 @@ input::placeholder{color:var(--ink-faint);}
 .status.err{color:var(--danger);}
 .status.inline{margin:0;}
 
-/* ============ CHI TIẾT GẤP ============ */
 .details-toggle{margin-top:14px;}
 .details-toggle summary{
   cursor:pointer;font-size:11px;color:var(--ink-faint);
@@ -206,7 +194,6 @@ input::placeholder{color:var(--ink-faint);}
 .details-toggle summary:hover{color:var(--ink-dim);}
 .details-toggle .hint{margin-top:8px;}
 
-/* ============ TABS ============ */
 .tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);}
 .tab{
   position:relative;
@@ -222,22 +209,18 @@ input::placeholder{color:var(--ink-faint);}
 .tab.active{color:var(--ink);}
 .tab.active::after{transform:scaleX(1);}
 
-/* ============ PANEL ============ */
 .panel{background:var(--bg);}
 .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
 .panel-head h2{font-size:14px;margin:0;font-weight:700;}
 .panel-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .count-badge{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
 
-/* Tab "Danh sách tài khoản": tách rời hàng tìm kiếm và hàng thao tác
-   để đỡ dồn cục nhiều nút cạnh nhau, đỡ rối mắt. */
 .panel-head--accounts{flex-direction:column;align-items:stretch;gap:8px;}
 .panel-head-top{display:flex;align-items:center;gap:10px;}
 .panel-head-top .search-input{flex:1;min-width:0;}
 .panel-head--accounts .panel-head-actions{justify-content:flex-end;}
 .sort-hint{margin-bottom:10px;}
 
-/* ============ TABLE ============ */
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
 thead th{
@@ -265,7 +248,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .bank-select{width:100%;}
 .stt-cell{font-family:var(--mono);color:var(--ink-faint);text-align:center;width:38px;}
 
-/* ============ Ô TÌM/LỌC NGÂN HÀNG (thay cho select thường, dropdown dài khó tìm) ============ */
 .bank-input{width:100%;cursor:pointer;font-family:var(--body);}
 .bank-input:focus{cursor:text;}
 .bank-picker-popup{
@@ -286,7 +268,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .bank-picker-item:hover .bank-picker-code,.bank-picker-item.active .bank-picker-code{color:var(--accent-bright);}
 .bank-picker-empty{padding:14px 10px;font-size:12px;color:var(--ink-faint);text-align:center;}
 
-/* ============ WORKSPACE: 2 tab Tạo giao dịch | Mẫu giao dịch ============ */
 .workspace-tabs{margin-bottom:16px;}
 .workspace{display:block;}
 .mau-panel{background:var(--bg);max-width:640px;margin:0 auto;}
@@ -312,7 +293,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
   border:1px dashed var(--border);border-radius:var(--radius-sm);margin:10px 0 12px;
 }
 
-/* ============ QR TAB ============ */
 .qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
 .qr-form{display:flex;flex-direction:column;gap:14px;}
 
@@ -330,7 +310,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .qr-form-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .qr-form-actions .btn{flex:1;justify-content:center;min-width:118px;font-size:11.5px;padding:8px 10px;}
 
-/* Khối gom nhóm trường theo ngữ cảnh (Mẫu & tài khoản / Số tiền & nội dung) */
 .form-section{
   background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
   padding:14px 15px 15px;
@@ -358,7 +337,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .qr-empty svg{opacity:.15;color:var(--accent);width:64px;height:64px;}
 .qr-empty p{margin:0;max-width:220px;}
 
-/* ============ FIELD COUNTER / VALIDATION ============ */
 .field-counter{font-size:10.5px;color:var(--ink-faint);text-align:right;margin-top:3px;}
 .field-counter.warn{color:var(--accent-bright);}
 .field-counter.err{color:var(--danger);}
@@ -387,7 +365,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .hint.inline-hint{margin:0;font-size:10.5px;}
 .field-warning{font-size:11px;color:var(--danger);margin-top:4px;min-height:0;}
 
-/* thẻ QR: viền vàng mảnh, dấu "Đã tạo" mạ vàng ở góc */
 .qr-card{
   position:relative;
   width:100%;max-width:340px;
@@ -425,14 +402,12 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .qr-actions{display:flex;gap:8px;width:100%;max-width:340px;flex-wrap:wrap;}
 .qr-actions .btn{flex:1;justify-content:center;min-width:100px;}
 
-/* ============ FOOTER ============ */
 .footer{
   text-align:center;color:var(--ink-faint);font-size:10.5px;
   padding:14px 16px 18px;
   border-top:1px solid var(--border);
 }
 
-/* ============ QUICK AMOUNT CHIPS ============ */
 .quick-amounts{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 9px;}
 .chip{
   font-family:var(--mono);font-size:11.5px;font-weight:600;
@@ -449,7 +424,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .chip.suggest{background:var(--accent-wash);border-color:var(--accent-dark);color:var(--accent-bright);}
 .chip.suggest:hover{border-color:var(--accent-bright);background:rgba(76,126,243,.18);}
 
-/* ============ SEARCH INPUT ============ */
 .search-input{
   font-family:var(--body);font-size:12px;
   background:var(--bg);border:1px solid var(--border);border-radius:20px;
@@ -459,7 +433,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 .search-input:focus{border-color:var(--accent);}
 .search-input::placeholder{color:var(--ink-faint);}
 
-/* ============ QR LOADING STATE ============ */
 .qr-card.loading .qr-card-imgwrap img.visible{opacity:.15;}
 .qr-card.loading .qr-card-imgwrap::before{
   content:"";position:absolute;inset:0;border-radius:8px;
@@ -481,7 +454,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 }
 @keyframes qr-spin{to{transform:rotate(360deg);}}
 
-/* ============ BUTTON SPINNER ============ */
 .btn.is-loading{color:transparent !important;pointer-events:none;position:relative;}
 .btn.is-loading::after{
   content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;
@@ -494,7 +466,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
 }
 @keyframes btn-spin{ to{transform:rotate(360deg);} }
 
-/* ============ TOAST NOTIFICATIONS ============ */
 .toast-stack{
   position:fixed;top:16px;right:16px;z-index:100;
   display:flex;flex-direction:column;gap:8px;
@@ -532,7 +503,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
   .field-row .field{margin-bottom:11px;}
   .field-row .field:last-child{margin-bottom:0;}
 
-  /* Bảng tài khoản -> dạng thẻ dọc trên mobile */
   .table-wrap{border:none;background:none;overflow-x:visible;}
   #bankTable thead{display:none;}
   #bankTable, #bankTable tbody{display:block;width:100%;}
@@ -563,7 +533,6 @@ td input:focus{background:var(--bg);border-color:var(--accent);}
   .brand-text p{display:none;}
 }
 
-/* ============ MÀN HÌNH RỘNG ============ */
 @media (min-width:1100px){
   .pages{padding:32px 32px 20px;}
   .topbar{padding:20px 32px;}

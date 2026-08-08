@@ -1,34 +1,16 @@
-// ============================================================
-// VietQR Generator — Trình tạo mã QR VietQR (chạy tĩnh trên GitHub Pages)
-// 2 nguồn dữ liệu:
-//   data/vietqr-banks.json  -> danh sách gốc VietQR (tham chiếu, read-only)
-//                              nếu chưa có file này / load lỗi -> tự lấy thẳng từ API VietQR
-//   data/my-accounts.json   -> tài khoản cá nhân (CRUD, đồng bộ GitHub)
-// Mẫu hiển thị QR (compact2/compact/print/qr_only) là dữ liệu tĩnh khai báo
-// ngay trong file này (QR_DISPLAY_TEMPLATES), không cần file riêng.
-//
-// Giao diện tách 2 cửa sổ:
-//   - "Mẫu giao dịch": danh sách mẫu chuyển tiền, bấm để nạp vào form.
-//   - "Tạo giao dịch": form tạo mã QR (tài khoản/số tiền/nội dung/mẫu hiển thị).
-// Toàn bộ thông tin đang nhập ở form (tài khoản, số tiền, nội dung, mẫu hiển
-// thị, mẫu giao dịch đang chọn) được lưu vào localStorage sau mỗi lần thay
-// đổi -> mở lại / F5 không bị mất. Nút "Xoá thông tin" xoá dữ liệu đã lưu này.
-// ============================================================
-
 const LS_GH_CONFIG = "vietqr_gh_config";
 const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
 const LS_PRESETS_CACHE = "vietqr_presets_cache";
-const LS_DEFAULTS = "vietqr_defaults"; // { accountKey, template }
-const LS_FORM_STATE = "vietqr_form_state"; // { accountIdx, amount, content, template, selectedPresetIdx }
-const LS_REFBANKS_CACHE = "vietqr_refbanks_cache"; // { data, fetchedAt }
-const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000; // 12 giờ — tránh gọi API VietQR mỗi lần mở app
+const LS_DEFAULTS = "vietqr_defaults";
+const LS_FORM_STATE = "vietqr_form_state";
+const LS_REFBANKS_CACHE = "vietqr_refbanks_cache";
+const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000;
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
-const ADDINFO_SOFT_LIMIT = 25; // giới hạn addInfo phổ biến của nhiều ngân hàng qua VietQR
-const AMOUNT_WARN_THRESHOLD = 500_000_000; // ngưỡng cảnh báo số tiền bất thường
+const ADDINFO_SOFT_LIMIT = 25;
+const AMOUNT_WARN_THRESHOLD = 500_000_000;
 
-// Mẫu hiển thị QR: load từ data/templates.json lúc init(), có fallback cứng nếu fetch lỗi
 let QR_DISPLAY_TEMPLATES = [
   { value: "compact2", label: "Compact 2" },
   { value: "compact", label: "Compact" },
@@ -42,12 +24,10 @@ async function loadQrDisplayTemplates() {
     const data = await res.json();
     if (Array.isArray(data) && data.length) QR_DISPLAY_TEMPLATES = data;
   } catch (e) {
-    /* giữ nguyên fallback cứng ở trên nếu file chưa có / lỗi */
+
   }
 }
 
-// Danh sách nội dung chuyển khoản gợi ý -> load từ data/noi-dung-chuyen-khoan.json
-// Mỗi phần tử là 1 chuỗi (string). Không có -> ẩn hẳn khu vực gợi ý.
 let CONTENT_SUGGESTIONS = [];
 async function loadContentSuggestions() {
   try {
@@ -60,21 +40,15 @@ async function loadContentSuggestions() {
   }
 }
 
-// Mẫu chuyển tiền (preset điền nhanh cả tài khoản/số tiền/mẫu hiển thị/nội dung) —
-// lưu ở state.presets, load/sync giống hệt state.accounts (cache -> file cục bộ -> GitHub).
-// Mỗi phần tử: { name, accountName, amount, content, template }.
-// accountName để trống -> giữ nguyên tài khoản đang chọn khi áp dụng mẫu.
-
 let state = {
   refBanks: [],
   accounts: [],
   presets: [],
-  selectedPresetIdx: null, // mẫu giao dịch đang được nạp vào form (null = không có)
+  selectedPresetIdx: null,
   sha: { accounts: null, presets: null },
   gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json", pathPresets: "data/mau-chuyen-tien.json" },
 };
 
-// ---------- Custom confirm dialog (thay window.confirm mặc định) ----------
 function showConfirm(message, okLabel) {
   return new Promise((resolve) => {
     const backdrop = $("#confirmBackdrop");
@@ -111,12 +85,11 @@ function showConfirm(message, okLabel) {
   });
 }
 
-// ---------- Toast notification ----------
-const TOAST_MAX_VISIBLE = 4; // giới hạn số toast chồng cùng lúc, tránh spam khi thao tác liên tiếp
+const TOAST_MAX_VISIBLE = 4;
 function showToast(message, kind, opts) {
   const stack = document.getElementById("toastStack");
   if (!stack) return;
-  // Nếu đã đầy, dọn bớt toast cũ nhất (không animation-out, để nhường chỗ ngay)
+
   while (stack.children.length >= TOAST_MAX_VISIBLE) {
     stack.firstElementChild.remove();
   }
@@ -158,7 +131,6 @@ function showToast(message, kind, opts) {
   stack.appendChild(toast);
 }
 
-// ---------- utils ----------
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -226,7 +198,7 @@ function loadGhConfigFromStorage() {
 // Đồng bộ các ô nhập (owner/repo/branch/path/token) đang có trên form vào state.gh + localStorage.
 // Gọi hàm này ở ĐẦU mọi thao tác gọi API GitHub (tải/lưu), để không bắt buộc phải bấm
 // "Lưu thông tin kết nối" trước — tránh lỗi 401 do dùng token/owner/repo cũ còn sót lại
-// trong localStorage trong khi ô nhập đã gõ giá trị mới nhưng chưa lưu.
+
 function syncGhInputsToState() {
   const owner = $("#ghOwner").value.trim();
   const repo = $("#ghRepo").value.trim();
@@ -314,7 +286,6 @@ async function checkGhConnection() {
   }
 }
 
-// ---------- Generic GitHub read/write for a JSON file ----------
 async function ghReadJson(path) {
   const headers = { Accept: "application/vnd.github+json" };
   const token = getToken();
@@ -356,7 +327,7 @@ async function ghWriteJson(path, data, sha, message) {
   }
 
   try {
-    // Nếu chưa có SHA → lấy mới từ GitHub
+
     let currentSha = sha;
     if (!currentSha) {
       const latest = await ghReadJson(path);
@@ -364,7 +335,7 @@ async function ghWriteJson(path, data, sha, message) {
     }
     return await put(currentSha);
   } catch (err) {
-    // SHA cũ không khớp → lấy SHA mới nhất rồi thử lại 1 lần
+
     const isShaMismatch =
       err.status === 409 ||
       (err.message && /does not match|sha.*mismatch|conflict/i.test(err.message));
@@ -407,9 +378,6 @@ async function loadAllFromGithub() {
   }
 }
 
-// Tự động kéo dữ liệu mới nhất từ GitHub ngay khi mở app (nếu đã cấu hình kết nối) —
-// không cần bấm nút "Tải dữ liệu từ GitHub" thủ công mỗi lần. Chạy ngầm, lỗi thì bỏ qua
-// trong im lặng (vẫn còn dữ liệu cache cục bộ để dùng), không làm phiền lúc mới mở app.
 async function syncFromGithubSilently() {
   if (!state.gh.owner || !state.gh.repo || !getToken()) return;
   try {
@@ -541,7 +509,6 @@ async function savePresetsToGithub() {
   }
 }
 
-// ---------- Reference bank list (vietqr-banks.json) ----------
 function mapVietQrApiBanks(payload) {
   if (!payload || !Array.isArray(payload.data)) return [];
   return payload.data.map((b) => ({
@@ -572,7 +539,7 @@ async function fetchRefBanksFromApi() {
   return mapVietQrApiBanks(payload);
 }
 async function loadRefBanks() {
-  // Ưu tiên file cục bộ trong repo, nếu chưa có / lỗi thì lấy thẳng từ API VietQR
+
   try {
     const res = await fetch("data/vietqr-banks.json");
     if (!res.ok) throw new Error("no local file");
@@ -583,7 +550,7 @@ async function loadRefBanks() {
     }
     throw new Error("empty local file");
   } catch (e) {
-    /* rơi xuống lấy từ cache/API */
+
   }
   const cached = readRefBanksCache();
   if (cached && Date.now() - cached.fetchedAt < REFBANKS_TTL_MS) {
@@ -831,7 +798,7 @@ function renderTable() {
     input.addEventListener("click", (e) => openBankPicker(Number(e.target.dataset.idx), e.target));
     input.addEventListener("input", (e) => renderBankPickerList(Number(e.target.dataset.idx), e.target.value));
     input.addEventListener("blur", (e) => {
-      // gõ tìm rồi bấm ra ngoài mà không chọn -> khôi phục lại đúng tên ngân hàng đang lưu
+
       const i = Number(e.target.dataset.idx);
       e.target.value = bankLabelForRow(state.accounts[i]);
     });
@@ -957,7 +924,6 @@ function flashLinkBtn(sel, text) {
   setTimeout(() => (btn.textContent = original), 1600);
 }
 
-// ---------- Lưu / khôi phục trạng thái form (sống sót qua F5) ----------
 function saveFormState() {
   try {
     localStorage.setItem(
@@ -997,7 +963,6 @@ function restoreFormState() {
   return true;
 }
 
-// ---------- QR tab ----------
 function populateQrTemplateOptions() {
   const sel = $("#qrTemplate");
   const prev = sel.value;
@@ -1091,8 +1056,7 @@ function selectMau(idx) {
   applyPresetToForm(preset);
   renderMauList();
   updateMauActiveUi();
-  // Nhảy luôn sang tab "Tạo giao dịch" để thấy mã QR vừa tạo — chọn mẫu xong không thấy
-  // gì vì QR nằm ở tab kia, phải tự bấm qua mới thấy, rất khó hiểu.
+
   switchWorkspaceTab("qr");
   saveFormState();
 }
@@ -1121,13 +1085,13 @@ function deleteMauPreset(idx) {
     },
   });
 }
-// Lưu form hiện tại thành 1 mẫu MỚI (không đụng tới mẫu đang chọn, nếu có).
+
 function saveCurrentFormAsPreset() {
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
   const defaultName = $("#qrContent").value.trim() || (acc ? acc.list_name : "Mẫu mới");
   const name = window.prompt("Tên mẫu chuyển tiền:", defaultName);
-  if (name == null) return; // huỷ
+  if (name == null) return;
   const trimmed = name.trim();
   if (!trimmed) {
     showToast("Tên mẫu không được để trống", "err");
@@ -1148,7 +1112,7 @@ function saveCurrentFormAsPreset() {
   saveFormState();
   showToast(`Đã lưu mẫu "${trimmed}"`, "ok");
 }
-// Ghi đè mẫu ĐANG CHỌN bằng nội dung form hiện tại.
+
 function updateSelectedPreset() {
   if (state.selectedPresetIdx == null) return;
   const preset = state.presets[state.selectedPresetIdx];
@@ -1190,8 +1154,7 @@ function buildQrUrlRaw(bankCode, accNum, amount, content, template, accountName)
 function buildQrUrl(acc, amount, content, template) {
   return buildQrUrlRaw(acc.data__code, acc.data_num, amount, content, template, acc.name_ac);
 }
-// Hai <img> chồng nhau (#qrImageA / #qrImageB): ảnh mới load ngầm ở lớp ẩn,
-// khi load xong mới crossfade lên trên, tránh chớp trắng lúc đổi ảnh QR.
+
 let qrActiveLayer = "A";
 function validateAmount(rawAmount) {
   const el = $("#qrAmountWarning");
@@ -1208,7 +1171,7 @@ function validateAmount(rawAmount) {
   if (n > AMOUNT_WARN_THRESHOLD) {
     el.textContent = `Số tiền khá lớn (${formatNumber(n)}đ) — kiểm tra lại trước khi gửi.`;
     el.hidden = false;
-    return true; // chỉ cảnh báo, không chặn tạo QR
+    return true;
   }
   el.hidden = true;
   return true;
@@ -1394,7 +1357,6 @@ function initRippleEffect() {
   });
 }
 
-// ---------- Xoá thông tin đang nhập (giữ nguyên danh sách tài khoản/mẫu) ----------
 async function clearEnteredInfo() {
   const ok = await showConfirm("Xoá số tiền, nội dung và mẫu đang chọn trên form? (không xoá danh sách tài khoản/mẫu)", "Xoá");
   if (!ok) return;
@@ -1413,7 +1375,6 @@ async function clearEnteredInfo() {
   showToast("Đã xoá thông tin đang nhập", "ok");
 }
 
-// ---------- Init ----------
 async function init() {
   loadGhConfigFromStorage();
   initRippleEffect();
@@ -1445,7 +1406,7 @@ async function init() {
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (!$("#confirmBackdrop").hidden) return; // để confirm dialog tự xử lý Escape của riêng nó
+    if (!$("#confirmBackdrop").hidden) return;
     if (!$("#bankPickerPopup").hidden) {
       closeBankPicker();
       return;
@@ -1453,7 +1414,6 @@ async function init() {
     if (!$("#settingsBackdrop").hidden) closeSettingsModal();
   });
 
-  // Đóng popup tìm ngân hàng khi bấm ra ngoài / cuộn / đổi kích thước cửa sổ
   document.addEventListener("mousedown", (e) => {
     if (bankPickerOpenIdx == null) return;
     if (e.target.closest("#bankPickerPopup") || e.target.closest(".bank-input")) return;
@@ -1549,7 +1509,7 @@ async function init() {
     liveGenerate();
   });
   $("#qrContent").addEventListener("input", (e) => {
-    updateContentCounter(e.target.value.trim()); // phản hồi tức thì, không chờ debounce
+    updateContentCounter(e.target.value.trim());
     liveGenerate();
   });
   $("#btnCopyLink").addEventListener("click", async (e) => {
@@ -1569,7 +1529,6 @@ async function init() {
   switchWorkspaceTab("qr");
   onGenerateQr(null, { silent: true });
 
-  // Đồng bộ ngầm từ GitHub (nếu đã kết nối) — không chặn giao diện, không cần bấm nút thủ công
   syncFromGithubSilently();
 }
 
