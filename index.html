@@ -54,6 +54,8 @@
 
       <nav class="tabs settings-tabs">
         <button class="tab active" type="button" data-settings-tab="accounts">Danh sách tài khoản</button>
+        <button class="tab" type="button" data-settings-tab="content">Nội dung chuyển khoản</button>
+        <button class="tab" type="button" data-settings-tab="templates">Mẫu hiển thị QR</button>
         <button class="tab" type="button" data-settings-tab="github">Kết nối GitHub</button>
       </nav>
 
@@ -82,6 +84,55 @@
               </tr>
             </thead>
             <tbody id="bankTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="settings-tab-panel" id="settingsTabContent" hidden>
+        <div class="panel-head panel-head--accounts">
+          <div class="panel-head-top">
+            <span class="count-badge" id="contentCount">0 dòng</span>
+          </div>
+          <div class="panel-head-actions">
+            <button class="btn subtle" id="btnAddContentRow" type="button">+ Thêm dòng</button>
+            <button class="btn primary" id="btnSaveContentGithub" type="button">Lưu lên GitHub</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="contentTable">
+            <thead>
+              <tr>
+                <th style="width:38px">STT</th>
+                <th>Nội dung gợi ý</th>
+                <th style="width:56px"></th>
+              </tr>
+            </thead>
+            <tbody id="contentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="settings-tab-panel" id="settingsTabTemplates" hidden>
+        <div class="panel-head panel-head--accounts">
+          <div class="panel-head-top">
+            <span class="count-badge" id="templatesCount">0 mẫu</span>
+          </div>
+          <div class="panel-head-actions">
+            <button class="btn subtle" id="btnAddTemplateRow" type="button">+ Thêm dòng</button>
+            <button class="btn primary" id="btnSaveTemplatesGithub" type="button">Lưu lên GitHub</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="templatesTable">
+            <thead>
+              <tr>
+                <th style="width:38px">STT</th>
+                <th>Value (mã)</th>
+                <th>Label (tên hiển thị)</th>
+                <th style="width:56px"></th>
+              </tr>
+            </thead>
+            <tbody id="templatesTableBody"></tbody>
           </table>
         </div>
       </div>
@@ -124,6 +175,14 @@
             <label>
               <span>File mẫu chuyển tiền</span>
               <input id="ghPathPresets" type="text" value="data/mau-chuyen-tien.json">
+            </label>
+            <label>
+              <span>File nội dung chuyển khoản</span>
+              <input id="ghPathContent" type="text" value="data/noi-dung-chuyen-khoan.json">
+            </label>
+            <label>
+              <span>File mẫu hiển thị QR</span>
+              <input id="ghPathTemplates" type="text" value="data/templates.json">
             </label>
           </div>
         </details>

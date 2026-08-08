@@ -2,6 +2,8 @@ const LS_GH_CONFIG = "vietqr_gh_config";
 const LS_GH_TOKEN = "vietqr_gh_token";
 const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
 const LS_PRESETS_CACHE = "vietqr_presets_cache";
+const LS_CONTENT_CACHE = "vietqr_content_cache";
+const LS_TEMPLATES_CACHE = "vietqr_templates_cache";
 const LS_DEFAULTS = "vietqr_defaults";
 const LS_FORM_STATE = "vietqr_form_state";
 const LS_REFBANKS_CACHE = "vietqr_refbanks_cache";
@@ -11,42 +13,31 @@ const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
 const ADDINFO_SOFT_LIMIT = 25;
 const AMOUNT_WARN_THRESHOLD = 500_000_000;
 
-let QR_DISPLAY_TEMPLATES = [
+// Giá trị mặc định khi chưa có data/templates.json và chưa từng lưu gì (dùng làm fallback).
+const DEFAULT_QR_TEMPLATES = [
   { value: "compact2", label: "Compact 2" },
   { value: "compact", label: "Compact" },
   { value: "print", label: "Print" },
   { value: "qr_only", label: "Chỉ mã QR" },
 ];
-async function loadQrDisplayTemplates() {
-  try {
-    const res = await fetch("data/templates.json");
-    if (!res.ok) throw new Error("no file");
-    const data = await res.json();
-    if (Array.isArray(data) && data.length) QR_DISPLAY_TEMPLATES = data;
-  } catch (e) {
-
-  }
-}
-
-let CONTENT_SUGGESTIONS = [];
-async function loadContentSuggestions() {
-  try {
-    const res = await fetch("data/noi-dung-chuyen-khoan.json");
-    if (!res.ok) throw new Error("no file");
-    const data = await res.json();
-    if (Array.isArray(data)) CONTENT_SUGGESTIONS = data.filter((v) => typeof v === "string" && v.trim());
-  } catch (e) {
-    CONTENT_SUGGESTIONS = [];
-  }
-}
 
 let state = {
   refBanks: [],
   accounts: [],
   presets: [],
+  content: [],
+  templates: [],
   selectedPresetIdx: null,
-  sha: { accounts: null, presets: null },
-  gh: { owner: "", repo: "", branch: "main", pathAccounts: "data/my-accounts.json", pathPresets: "data/mau-chuyen-tien.json" },
+  sha: { accounts: null, presets: null, content: null, templates: null },
+  gh: {
+    owner: "",
+    repo: "",
+    branch: "main",
+    pathAccounts: "data/my-accounts.json",
+    pathPresets: "data/mau-chuyen-tien.json",
+    pathContent: "data/noi-dung-chuyen-khoan.json",
+    pathTemplates: "data/templates.json",
+  },
 };
 
 function showConfirm(message, okLabel) {
@@ -192,6 +183,8 @@ function loadGhConfigFromStorage() {
   $("#ghBranch").value = state.gh.branch || "main";
   $("#ghPathAccounts").value = state.gh.pathAccounts || "data/my-accounts.json";
   $("#ghPathPresets").value = state.gh.pathPresets || "data/mau-chuyen-tien.json";
+  $("#ghPathContent").value = state.gh.pathContent || "data/noi-dung-chuyen-khoan.json";
+  $("#ghPathTemplates").value = state.gh.pathTemplates || "data/templates.json";
   $("#ghToken").value = localStorage.getItem(LS_GH_TOKEN) || "";
   updateGhStatusLabel();
 }
@@ -207,6 +200,8 @@ function syncGhInputsToState() {
   state.gh.branch = $("#ghBranch").value.trim() || state.gh.branch || "main";
   state.gh.pathAccounts = $("#ghPathAccounts").value.trim() || state.gh.pathAccounts || "data/my-accounts.json";
   state.gh.pathPresets = $("#ghPathPresets").value.trim() || state.gh.pathPresets || "data/mau-chuyen-tien.json";
+  state.gh.pathContent = $("#ghPathContent").value.trim() || state.gh.pathContent || "data/noi-dung-chuyen-khoan.json";
+  state.gh.pathTemplates = $("#ghPathTemplates").value.trim() || state.gh.pathTemplates || "data/templates.json";
   const token = $("#ghToken").value.trim();
   if (token) localStorage.setItem(LS_GH_TOKEN, token);
   localStorage.setItem(LS_GH_CONFIG, JSON.stringify(state.gh));
@@ -366,10 +361,28 @@ async function loadAllFromGithub() {
       state.sha.presets = presets.sha;
       savePresetsCache();
     }
+    const content = await ghReadJson(state.gh.pathContent);
+    if (content.data) {
+      state.content = Array.isArray(content.data) ? content.data.filter((v) => typeof v === "string" && v.trim()) : [];
+      state.sha.content = content.sha;
+      saveContentCache();
+    }
+    const templates = await ghReadJson(state.gh.pathTemplates);
+    if (templates.data) {
+      state.templates = Array.isArray(templates.data) && templates.data.length ? templates.data : DEFAULT_QR_TEMPLATES.slice();
+      state.sha.templates = templates.sha;
+      saveTemplatesCache();
+    }
     renderTable();
     populateQrAccounts();
     renderMauList();
-    setStatus($("#ghMsg"), `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền.`, "ok");
+    populateQrTemplateOptions();
+    renderContentSuggestions();
+    setStatus(
+      $("#ghMsg"),
+      `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền, ${state.content.length} nội dung, ${state.templates.length} mẫu hiển thị.`,
+      "ok"
+    );
     $("#ghDot").className = "dot on";
   } catch (err) {
     console.error(err);
@@ -397,10 +410,26 @@ async function syncFromGithubSilently() {
       savePresetsCache();
       changed = true;
     }
+    const content = await ghReadJson(state.gh.pathContent);
+    if (content.data) {
+      state.content = Array.isArray(content.data) ? content.data.filter((v) => typeof v === "string" && v.trim()) : [];
+      state.sha.content = content.sha;
+      saveContentCache();
+      changed = true;
+    }
+    const templates = await ghReadJson(state.gh.pathTemplates);
+    if (templates.data) {
+      state.templates = Array.isArray(templates.data) && templates.data.length ? templates.data : DEFAULT_QR_TEMPLATES.slice();
+      state.sha.templates = templates.sha;
+      saveTemplatesCache();
+      changed = true;
+    }
     if (changed) {
       renderTable();
       populateQrAccounts();
       renderMauList();
+      populateQrTemplateOptions();
+      renderContentSuggestions();
       updateMauActiveUi();
       onGenerateQr(null, { silent: true });
     }
@@ -498,6 +527,99 @@ async function savePresetsToGithub() {
     );
     setStatus($("#ghMsg"), "Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
     showToast("Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
+  } catch (err) {
+    console.error(err);
+    setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
+    showToast("Lỗi khi lưu lên GitHub", "err");
+    openSettingsModal("github");
+  } finally {
+    btn.classList.remove("is-loading");
+    btn.disabled = false;
+  }
+}
+
+async function saveContentToGithub() {
+  syncGhInputsToState();
+  if (!state.gh.owner || !state.gh.repo) {
+    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
+    openSettingsModal("github");
+    return;
+  }
+  if (!state.content.length) {
+    const ok = await showConfirm(
+      "Danh sách nội dung chuyển khoản đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu đang có trên GitHub. Vẫn tiếp tục?",
+      "Vẫn lưu (xoá hết)"
+    );
+    if (!ok) return;
+  }
+  const emptyRows = state.content.map((c, i) => (!c || !c.trim() ? i + 1 : null)).filter((n) => n != null);
+  if (emptyRows.length) {
+    showToast(`Dòng ${emptyRows.join(", ")} chưa có nội dung — điền hoặc xoá trước khi lưu.`, "err");
+    return;
+  }
+  const btn = $("#btnSaveContentGithub");
+  btn.classList.add("is-loading");
+  btn.disabled = true;
+  setStatus($("#ghMsg"), "Đang lưu nội dung chuyển khoản lên GitHub…");
+  try {
+    state.sha.content = await ghWriteJson(
+      state.gh.pathContent,
+      state.content,
+      state.sha.content,
+      `chore: cập nhật noi-dung-chuyen-khoan.json (${new Date().toISOString()})`
+    );
+    setStatus($("#ghMsg"), "Đã lưu nội dung chuyển khoản lên GitHub ✓", "ok");
+    showToast("Đã lưu nội dung chuyển khoản lên GitHub ✓", "ok");
+  } catch (err) {
+    console.error(err);
+    setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
+    showToast("Lỗi khi lưu lên GitHub", "err");
+    openSettingsModal("github");
+  } finally {
+    btn.classList.remove("is-loading");
+    btn.disabled = false;
+  }
+}
+
+async function saveTemplatesToGithub() {
+  syncGhInputsToState();
+  if (!state.gh.owner || !state.gh.repo) {
+    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
+    openSettingsModal("github");
+    return;
+  }
+  if (!state.templates.length) {
+    const ok = await showConfirm(
+      "Danh sách mẫu hiển thị QR đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu đang có trên GitHub. Vẫn tiếp tục?",
+      "Vẫn lưu (xoá hết)"
+    );
+    if (!ok) return;
+  }
+  const invalidRows = [];
+  state.templates.forEach((t, i) => {
+    const missing = [];
+    if (!t.value || !String(t.value).trim()) missing.push("value");
+    if (!t.label || !String(t.label).trim()) missing.push("label");
+    if (missing.length) invalidRows.push({ row: i + 1, missing });
+  });
+  if (invalidRows.length) {
+    const detail = invalidRows.map((r) => `dòng ${r.row} (thiếu ${r.missing.join(", ")})`).join("; ");
+    showToast(`Chưa lưu được: ${detail}.`, "err");
+    return;
+  }
+  const btn = $("#btnSaveTemplatesGithub");
+  btn.classList.add("is-loading");
+  btn.disabled = true;
+  setStatus($("#ghMsg"), "Đang lưu mẫu hiển thị QR lên GitHub…");
+  try {
+    state.sha.templates = await ghWriteJson(
+      state.gh.pathTemplates,
+      state.templates,
+      state.sha.templates,
+      `chore: cập nhật templates.json (${new Date().toISOString()})`
+    );
+    setStatus($("#ghMsg"), "Đã lưu mẫu hiển thị QR lên GitHub ✓", "ok");
+    showToast("Đã lưu mẫu hiển thị QR lên GitHub ✓", "ok");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
@@ -715,6 +837,59 @@ async function loadPresetsInitial() {
 }
 function savePresetsCache() {
   localStorage.setItem(LS_PRESETS_CACHE, JSON.stringify(state.presets));
+}
+
+// ---------- Nội dung chuyển khoản (gợi ý) cache + load ----------
+function loadContentCache() {
+  const cached = localStorage.getItem(LS_CONTENT_CACHE);
+  if (cached) {
+    try {
+      state.content = JSON.parse(cached);
+      return;
+    } catch (e) {}
+  }
+}
+async function loadContentInitial() {
+  loadContentCache();
+  if (state.content.length) return;
+  try {
+    const res = await fetch("data/noi-dung-chuyen-khoan.json");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) state.content = data.filter((v) => typeof v === "string" && v.trim());
+    }
+  } catch (e) {
+    state.content = [];
+  }
+}
+function saveContentCache() {
+  localStorage.setItem(LS_CONTENT_CACHE, JSON.stringify(state.content));
+}
+
+// ---------- Mẫu hiển thị QR cache + load ----------
+function loadTemplatesCache() {
+  const cached = localStorage.getItem(LS_TEMPLATES_CACHE);
+  if (cached) {
+    try {
+      state.templates = JSON.parse(cached);
+      return;
+    } catch (e) {}
+  }
+}
+async function loadTemplatesInitial() {
+  loadTemplatesCache();
+  if (state.templates.length) return;
+  try {
+    const res = await fetch("data/templates.json");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) state.templates = data;
+    }
+  } catch (e) {}
+  if (!state.templates.length) state.templates = DEFAULT_QR_TEMPLATES.slice();
+}
+function saveTemplatesCache() {
+  localStorage.setItem(LS_TEMPLATES_CACHE, JSON.stringify(state.templates));
 }
 function applyBankToRow(idx, bankCode) {
   const bank = state.refBanks.find((b) => b.code === bankCode);
@@ -1017,7 +1192,7 @@ function restoreFormState() {
 function populateQrTemplateOptions() {
   const sel = $("#qrTemplate");
   const prev = sel.value;
-  sel.innerHTML = QR_DISPLAY_TEMPLATES.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
+  sel.innerHTML = state.templates.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
   if (prev) sel.value = prev;
 }
 
@@ -1296,14 +1471,14 @@ function renderContentSuggestions() {
   const wrap = $("#contentSuggestions");
   const toggle = $("#btnContentSuggestToggle");
   if (!wrap || !toggle) return;
-  if (!CONTENT_SUGGESTIONS.length) {
+  if (!state.content.length) {
     toggle.hidden = true;
     wrap.hidden = true;
     wrap.innerHTML = "";
     return;
   }
   toggle.hidden = false;
-  wrap.innerHTML = CONTENT_SUGGESTIONS.map((c) => {
+  wrap.innerHTML = state.content.map((c) => {
     const isDefault = isDefaultContent(c);
     return `<div class="combo-row">
       <button type="button" class="combo-item" data-content="${escapeAttr(c)}">${escapeHtml(c)}</button>
@@ -1388,6 +1563,124 @@ function onGenerateQr(e, opts) {
   saveFormState();
 }
 
+// ---------- Cài đặt: Nội dung chuyển khoản (bảng quản lý) ----------
+function renderContentTable() {
+  const body = $("#contentTableBody");
+  if (!body) return;
+  body.innerHTML = "";
+  state.content.forEach((text, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
+      <td data-label="Nội dung gợi ý"><input data-content-idx="${idx}" value="${escapeAttr(text)}"></td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Xoá dòng" data-content-del="${idx}">✕</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+  const countEl = $("#contentCount");
+  if (countEl) countEl.textContent = `${state.content.length} dòng`;
+
+  body.querySelectorAll("input[data-content-idx]").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const idx = Number(e.target.dataset.contentIdx);
+      state.content[idx] = e.target.value;
+      saveContentCache();
+      renderContentSuggestions();
+    });
+  });
+  body.querySelectorAll("[data-content-del]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.target.dataset.contentDel);
+      const removed = state.content[idx];
+      state.content.splice(idx, 1);
+      saveContentCache();
+      renderContentTable();
+      renderContentSuggestions();
+      showToast(`Đã xoá "${removed}"`, "ok", {
+        duration: 5000,
+        actionLabel: "Hoàn tác",
+        onAction: () => {
+          const restoreAt = Math.min(idx, state.content.length);
+          state.content.splice(restoreAt, 0, removed);
+          saveContentCache();
+          renderContentTable();
+          renderContentSuggestions();
+          showToast(`Đã khôi phục "${removed}"`, "ok");
+        },
+      });
+    });
+  });
+}
+function addContentRow() {
+  state.content.push("");
+  saveContentCache();
+  renderContentTable();
+  const inputs = $("#contentTableBody").querySelectorAll("input[data-content-idx]");
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
+}
+
+// ---------- Cài đặt: Mẫu hiển thị QR (bảng quản lý) ----------
+function renderTemplatesTable() {
+  const body = $("#templatesTableBody");
+  if (!body) return;
+  body.innerHTML = "";
+  state.templates.forEach((t, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
+      <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}"></td>
+      <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}"></td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+  const countEl = $("#templatesCount");
+  if (countEl) countEl.textContent = `${state.templates.length} mẫu`;
+
+  body.querySelectorAll("input[data-tpl-field]").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const idx = Number(e.target.dataset.tplIdx);
+      const field = e.target.dataset.tplField;
+      state.templates[idx][field] = e.target.value;
+      saveTemplatesCache();
+      populateQrTemplateOptions();
+    });
+  });
+  body.querySelectorAll("[data-tpl-del]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.target.dataset.tplDel);
+      const removed = state.templates[idx];
+      state.templates.splice(idx, 1);
+      saveTemplatesCache();
+      renderTemplatesTable();
+      populateQrTemplateOptions();
+      showToast(`Đã xoá "${removed.label || removed.value}"`, "ok", {
+        duration: 5000,
+        actionLabel: "Hoàn tác",
+        onAction: () => {
+          const restoreAt = Math.min(idx, state.templates.length);
+          state.templates.splice(restoreAt, 0, removed);
+          saveTemplatesCache();
+          renderTemplatesTable();
+          populateQrTemplateOptions();
+          showToast(`Đã khôi phục "${removed.label || removed.value}"`, "ok");
+        },
+      });
+    });
+  });
+}
+function addTemplateRow() {
+  state.templates.push({ value: "", label: "" });
+  saveTemplatesCache();
+  renderTemplatesTable();
+  const inputs = $("#templatesTableBody").querySelectorAll("input[data-tpl-field='value']");
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
+}
+
 // ---------- Workspace tabs (Tạo giao dịch / Mẫu giao dịch) ----------
 function switchWorkspaceTab(tabName) {
   $$(".workspace-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.workspaceTab === tabName));
@@ -1400,8 +1693,12 @@ function switchWorkspaceTab(tabName) {
 function switchSettingsTab(tabName) {
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
+  $("#settingsTabContent").hidden = tabName !== "content";
+  $("#settingsTabTemplates").hidden = tabName !== "templates";
   $("#settingsTabGithub").hidden = tabName !== "github";
   if (tabName === "accounts") renderTable();
+  if (tabName === "content") renderContentTable();
+  if (tabName === "templates") renderTemplatesTable();
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;
@@ -1455,8 +1752,8 @@ async function init() {
   await loadRefBanks();
   await loadAccountsInitial();
   await loadPresetsInitial();
-  await loadQrDisplayTemplates();
-  await loadContentSuggestions();
+  await loadTemplatesInitial();
+  await loadContentInitial();
 
   renderTable();
   populateQrTemplateOptions();
@@ -1529,6 +1826,16 @@ async function init() {
   $("#btnSaveMauGithub").addEventListener("click", async () => {
     savePresetsCache();
     await savePresetsToGithub();
+  });
+  $("#btnAddContentRow").addEventListener("click", addContentRow);
+  $("#btnSaveContentGithub").addEventListener("click", async () => {
+    saveContentCache();
+    await saveContentToGithub();
+  });
+  $("#btnAddTemplateRow").addEventListener("click", addTemplateRow);
+  $("#btnSaveTemplatesGithub").addEventListener("click", async () => {
+    saveTemplatesCache();
+    await saveTemplatesToGithub();
   });
   $("#btnSavePreset").addEventListener("click", saveCurrentFormAsPreset);
   $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
