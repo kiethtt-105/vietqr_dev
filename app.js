@@ -1690,8 +1690,19 @@ function switchWorkspaceTab(tabName) {
 }
 
 // ---------- Settings modal (danh sách tài khoản + kết nối GitHub) ----------
+// Chuyển tab: chốt chiều cao hiện tại của viewport, đổi nội dung, rồi animate
+// mượt sang chiều cao thật của tab mới (thay vì để CSS ép 1 chiều cao cố định
+// gây khoảng trắng thừa ở tab ngắn, hoặc để khung nhảy khựng khi tab dài/ngắn
+// khác nhau). Sau khi animate xong, trả viewport về height:auto để các thay
+// đổi sau đó trong cùng tab (thêm/xoá dòng) tự co giãn bình thường.
 function switchSettingsTab(tabName) {
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
+
+  const viewport = $("#settingsTabsViewport");
+  if (viewport) {
+    viewport.style.height = viewport.getBoundingClientRect().height + "px";
+  }
+
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
   $("#settingsTabContent").hidden = tabName !== "content";
   $("#settingsTabTemplates").hidden = tabName !== "templates";
@@ -1699,6 +1710,18 @@ function switchSettingsTab(tabName) {
   if (tabName === "accounts") renderTable();
   if (tabName === "content") renderContentTable();
   if (tabName === "templates") renderTemplatesTable();
+
+  if (viewport) {
+    const activePanel = viewport.querySelector(".settings-tab-panel:not([hidden])");
+    requestAnimationFrame(() => {
+      if (!activePanel) return;
+      viewport.style.height = activePanel.getBoundingClientRect().height + "px";
+      clearTimeout(viewport._heightResetTimer);
+      viewport._heightResetTimer = setTimeout(() => {
+        viewport.style.height = "auto";
+      }, 240);
+    });
+  }
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;

@@ -146,22 +146,32 @@ body{
   border-radius:var(--radius);padding:18px 20px 20px;
   box-shadow:0 20px 60px rgba(0,0,0,.5);
 }
-/* Cửa sổ Cài đặt: chiều cao CỐ ĐỊNH bất kể đang ở tab nào, để chuyển tab
-   không làm khung nhảy/co giãn kích thước — mỗi tab chỉ cuộn nội dung riêng. */
+/* Cửa sổ Cài đặt: cao theo ĐÚNG nội dung của từng tab (không còn khung cố
+   định gây khoảng trắng thừa ở tab ngắn như "Kết nối GitHub"). Để chuyển tab
+   không bị "khựng" nhảy kích thước, phần viewport bên dưới được animate chiều
+   cao mượt bằng JS (switchSettingsTab trong app.js) thay vì set cứng bằng CSS. */
 .gh-panel.settings-panel{
   max-width:900px;
-  height:min(640px, 86vh);
+  max-height:88vh;
   display:flex;flex-direction:column;
   overflow:hidden;
 }
 .gh-panel.settings-panel .gh-panel-head{flex:none;}
 .settings-tabs{margin-top:2px;flex:none;}
+.settings-tabs-viewport{
+  flex:none;overflow:hidden;
+  transition:height .22s cubic-bezier(.22,.8,.32,1);
+}
+/* Mỗi tab tự giới hạn chiều cao tối đa + tự cuộn riêng nếu nội dung quá dài
+   (vd. bảng tài khoản nhiều dòng), để 1 tab dài không kéo cả cửa sổ giãn to. */
 .settings-tab-panel{
-  padding-top:14px;padding-bottom:2px;
-  flex:1;min-height:0;overflow-y:auto;
-  display:flex;flex-direction:column;
+  padding-top:14px;padding-bottom:4px;
+  max-height:min(540px, 68vh);overflow-y:auto;
 }
 .settings-tab-panel[hidden]{display:none;}
+/* Tab GitHub có ít trường nhập hơn hẳn 3 tab bảng còn lại — giới hạn bề rộng
+   và canh giữa để input không bị kéo dãn hết 900px, trông trống trải. */
+#settingsTabGithub{max-width:620px;width:100%;margin-left:auto;margin-right:auto;}
 .confirm-panel{max-width:340px;text-align:center;padding:22px 22px 20px;}
 .confirm-message{margin:0 0 16px;font-size:13.5px;color:var(--ink);line-height:1.5;}
 .confirm-actions{margin-top:0;justify-content:center;}
