@@ -14,5 +14,9 @@
   {
     "value": "qr_only",
     "label": "Qr_only"
+  },
+  {
+    "value": "BdT8CDO",
+    "label": "VietQR plus"
   }
 ]
