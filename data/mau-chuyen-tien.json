@@ -10,7 +10,7 @@
     "name": "VIETLOT SMS",
     "accountName": "Viettel Money",
     "amount": 500000,
-    "content": "9246061 HUYNH TRAN TUAN KIET",
+    "content": "",
     "template": "print"
   }
 ]
