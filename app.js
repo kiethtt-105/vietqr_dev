@@ -917,6 +917,57 @@ function setDefaultAccount() {
   localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
   flashLinkBtn("#btnSetDefaultAccount", "★ Đã đặt mặc định");
 }
+function isDefaultPreset(preset) {
+  const defaults = loadDefaults();
+  return !!(defaults.presetName && preset && preset.name === defaults.presetName);
+}
+function setDefaultPreset(idx) {
+  const preset = state.presets[idx];
+  if (!preset) return;
+  const defaults = loadDefaults();
+  if (defaults.presetName === preset.name) {
+    delete defaults.presetName;
+    showToast("Đã bỏ mẫu mặc định", "ok");
+  } else {
+    defaults.presetName = preset.name;
+    showToast(`Đã đặt "${preset.name}" làm mẫu mặc định`, "ok");
+  }
+  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+  renderMauList();
+}
+function applyDefaultPresetIfNeeded() {
+  if (state.selectedPresetIdx != null) return;
+  const defaults = loadDefaults();
+  if (!defaults.presetName) return;
+  const idx = state.presets.findIndex((p) => p.name === defaults.presetName);
+  if (idx < 0) return;
+  state.selectedPresetIdx = idx;
+  applyPresetToForm(state.presets[idx]);
+  updateMauActiveUi();
+}
+function isDefaultContent(content) {
+  const defaults = loadDefaults();
+  return !!(defaults.contentDefault && defaults.contentDefault === content);
+}
+function setDefaultContent(content) {
+  const defaults = loadDefaults();
+  if (defaults.contentDefault === content) {
+    delete defaults.contentDefault;
+    showToast("Đã bỏ nội dung mặc định", "ok");
+  } else {
+    defaults.contentDefault = content;
+    showToast("Đã đặt nội dung mặc định", "ok");
+  }
+  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+  renderContentSuggestions();
+}
+function applyDefaultContentIfNeeded() {
+  const defaults = loadDefaults();
+  if (!defaults.contentDefault) return;
+  if ($("#qrContent").value.trim()) return;
+  $("#qrContent").value = defaults.contentDefault;
+  updateContentCounter(defaults.contentDefault.trim());
+}
 function flashLinkBtn(sel, text) {
   const btn = $(sel);
   const original = btn.textContent;
@@ -981,6 +1032,7 @@ function renderMauList() {
   state.presets.forEach((p, idx) => {
     const amountText = p.amount ? formatNumber(p.amount) + "đ" : "—";
     const accText = p.accountName ? escapeHtml(p.accountName) : "(giữ tài khoản hiện tại)";
+    const isDefault = isDefaultPreset(p);
     const card = document.createElement("div");
     card.className = "mau-card" + (state.selectedPresetIdx === idx ? " active" : "");
     card.innerHTML = `
@@ -989,6 +1041,7 @@ function renderMauList() {
         <span class="mau-card-meta">${accText} · ${amountText}</span>
         ${p.content ? `<span class="mau-card-content">${escapeHtml(p.content)}</span>` : ""}
       </button>
+      <button type="button" class="icon-btn mau-card-star${isDefault ? " is-default" : ""}" title="${isDefault ? "Đang là mẫu mặc định — bấm để bỏ" : "Đặt làm mẫu mặc định"}" data-star="${idx}">${isDefault ? "★" : "☆"}</button>
       <button type="button" class="icon-btn mau-card-del" title="Xoá mẫu" data-del="${idx}">✕</button>`;
     wrap.appendChild(card);
   });
@@ -997,6 +1050,12 @@ function renderMauList() {
 
   wrap.querySelectorAll("[data-select]").forEach((btn) => {
     btn.addEventListener("click", () => selectMau(Number(btn.dataset.select)));
+  });
+  wrap.querySelectorAll("[data-star]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setDefaultPreset(Number(btn.dataset.star));
+    });
   });
   wrap.querySelectorAll("[data-del]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1188,7 +1247,7 @@ function updateContentCounter(content) {
 const AMOUNT_SUGGEST_MULTIPLIERS = [1000, 10000, 100000];
 const AMOUNT_SUGGEST_CAP = 1_000_000_000;
 function computeAmountSuggestions(rawAmount) {
-  if (!rawAmount) return [];
+  if (!rawAmount || rawAmount.length > 3) return [];
   const n = Number(rawAmount);
   if (!n) return [];
   const seen = new Set();
@@ -1244,13 +1303,25 @@ function renderContentSuggestions() {
     return;
   }
   toggle.hidden = false;
-  wrap.innerHTML = CONTENT_SUGGESTIONS.map((c) => `<button type="button" class="combo-item" data-content="${escapeAttr(c)}">${escapeHtml(c)}</button>`).join("");
+  wrap.innerHTML = CONTENT_SUGGESTIONS.map((c) => {
+    const isDefault = isDefaultContent(c);
+    return `<div class="combo-row">
+      <button type="button" class="combo-item" data-content="${escapeAttr(c)}">${escapeHtml(c)}</button>
+      <button type="button" class="icon-btn combo-star${isDefault ? " is-default" : ""}" title="${isDefault ? "Đang là nội dung mặc định — bấm để bỏ" : "Đặt làm nội dung mặc định"}" data-star-content="${escapeAttr(c)}">${isDefault ? "★" : "☆"}</button>
+    </div>`;
+  }).join("");
   wrap.querySelectorAll(".combo-item[data-content]").forEach((item) => {
     item.addEventListener("click", () => {
       $("#qrContent").value = item.dataset.content;
       updateContentCounter(item.dataset.content.trim());
       closeContentSuggestions();
       onGenerateQr(null, { silent: true });
+    });
+  });
+  wrap.querySelectorAll("[data-star-content]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setDefaultContent(btn.dataset.starContent);
     });
   });
 }
@@ -1367,6 +1438,8 @@ async function clearEnteredInfo() {
   updateContentCounter("");
   $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
   applyDefaults();
+  applyDefaultPresetIfNeeded();
+  applyDefaultContentIfNeeded();
   renderMauList();
   updateMauActiveUi();
   $("#qrCard").hidden = true;
@@ -1523,7 +1596,11 @@ async function init() {
 
   updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
-  restoreFormState();
+  const hadSavedState = restoreFormState();
+  if (!hadSavedState) {
+    applyDefaultPresetIfNeeded();
+    applyDefaultContentIfNeeded();
+  }
   updateContentCounter($("#qrContent").value.trim());
   updateMauActiveUi();
   switchWorkspaceTab("qr");
