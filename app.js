@@ -1216,7 +1216,7 @@ function setDefaultAccount() {
   const defaults = loadDefaults();
   defaults.accountKey = accountKey(acc);
   localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
-  flashLinkBtn("#btnSetDefaultAccount", "★ Đã đặt mặc định");
+  flashLinkBtn("#btnSetDefaultAccount", "★ ");
 }
 function isDefaultPreset(preset) {
   const defaults = loadDefaults();
@@ -2212,10 +2212,10 @@ function initRippleEffect() {
 }
 
 async function clearEnteredInfo() {
-  const ok = await showConfirm("Xoá số tiền, nội dung và mẫu đang chọn trên form? (không xoá danh sách tài khoản/mẫu)", "Xoá");
+  const ok = await showConfirm("Xoá số tiền, nội dung và mẫu đang chọn trên form", "Xoá");
   if (!ok) return;
   state.selectedPresetIdx = null;
-  clearFormState();
+  clearFormState();v-vvvv
   $("#qrAmount").value = "";
   $("#qrContent").value = "";
   updateContentCounter("");
@@ -2341,9 +2341,7 @@ async function init() {
     saveAmountsCache();
     await saveAmountsToGithub();
   });
-  $("#btnSavePreset").addEventListener("click", saveCurrentFormAsPreset);
   $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
-  $("#btnClearForm").addEventListener("click", clearEnteredInfo);
 
   $("#btnContentSuggestToggle").addEventListener("click", (e) => {
     e.stopPropagation();
