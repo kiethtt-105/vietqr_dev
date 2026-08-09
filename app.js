@@ -30,6 +30,9 @@ let state = {
   templates: [],
   selectedPresetIdx: null,
   sha: { accounts: null, presets: null, content: null, templates: null },
+  // Đánh dấu phần dữ liệu nào đang có thay đổi (thêm/sửa/xoá) ở local mà
+  // CHƯA được lưu lên GitHub — hiện chấm cam trên tab tương ứng để dễ nhận biết.
+  dirty: { accounts: false, presets: false, content: false, templates: false },
   gh: {
     owner: "",
     repo: "",
@@ -164,6 +167,31 @@ function restartAnimation(el) {
   el.style.animation = "none";
   void el.offsetWidth;
   el.style.animation = "";
+}
+// ---------- Theo dõi thay đổi CHƯA lưu lên GitHub ----------
+function updateDirtyIndicators() {
+  const map = {
+    accounts: '.settings-tabs .tab[data-settings-tab="accounts"]',
+    content: '.settings-tabs .tab[data-settings-tab="content"]',
+    templates: '.settings-tabs .tab[data-settings-tab="templates"]',
+    presets: '.settings-tabs .tab[data-settings-tab="mau"]',
+  };
+  Object.keys(map).forEach((key) => {
+    const el = $(map[key]);
+    if (el) el.classList.toggle("has-unsaved", !!state.dirty[key]);
+  });
+  const workspaceMauTab = $('.workspace-tabs .tab[data-workspace-tab="mau"]');
+  if (workspaceMauTab) workspaceMauTab.classList.toggle("has-unsaved", !!state.dirty.presets);
+}
+function markDirty(key) {
+  if (!(key in state.dirty)) return;
+  state.dirty[key] = true;
+  updateDirtyIndicators();
+}
+function clearDirty(key) {
+  if (!(key in state.dirty)) return;
+  state.dirty[key] = false;
+  updateDirtyIndicators();
 }
 function debounce(fn, ms) {
   let t;
@@ -379,6 +407,10 @@ async function loadAllFromGithub() {
     renderMauList();
     populateQrTemplateOptions();
     renderContentSuggestions();
+    clearDirty("accounts");
+    clearDirty("presets");
+    clearDirty("content");
+    clearDirty("templates");
     setStatus(
       $("#ghMsg"),
       `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền, ${state.content.length} nội dung, ${state.templates.length} mẫu hiển thị.`,
@@ -432,6 +464,10 @@ async function syncFromGithubSilently() {
       populateQrTemplateOptions();
       renderContentSuggestions();
       updateMauActiveUi();
+      clearDirty("accounts");
+      clearDirty("presets");
+      clearDirty("content");
+      clearDirty("templates");
       onGenerateQr(null, { silent: true });
     }
     $("#ghDot").className = "dot on";
@@ -483,6 +519,7 @@ async function saveAccountsToGithub() {
     );
     setStatus($("#ghMsg"), "Đã lưu danh sách tài khoản lên GitHub ✓", "ok");
     showToast("Đã lưu tài khoản lên GitHub ✓", "ok");
+    clearDirty("accounts");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
@@ -515,6 +552,14 @@ async function savePresetsToGithub() {
     showToast(`Mẫu ở dòng ${emptyRows.join(", ")} chưa có tên — điền hoặc xoá trước khi lưu.`, "err");
     return;
   }
+  const unresolvedRows = state.presets
+    .map((p, i) => ((p.accountName || p.accountNum) && !findAccountForPreset(p) ? i + 1 : null))
+    .filter((n) => n != null);
+  if (unresolvedRows.length) {
+    showToast(`Mẫu ở dòng ${unresolvedRows.join(", ")} chưa chọn đúng tài khoản — mở tab "Mẫu chuyển tiền" để chọn lại.`, "err");
+    openSettingsModal("mau");
+    return;
+  }
   const btns = $$(".js-save-mau-btn");
   btns.forEach((b) => {
     b.classList.add("is-loading");
@@ -530,6 +575,7 @@ async function savePresetsToGithub() {
     );
     setStatus($("#ghMsg"), "Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
     showToast("Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
+    clearDirty("presets");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
@@ -575,6 +621,7 @@ async function saveContentToGithub() {
     );
     setStatus($("#ghMsg"), "Đã lưu nội dung chuyển khoản lên GitHub ✓", "ok");
     showToast("Đã lưu nội dung chuyển khoản lên GitHub ✓", "ok");
+    clearDirty("content");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
@@ -625,6 +672,7 @@ async function saveTemplatesToGithub() {
     );
     setStatus($("#ghMsg"), "Đã lưu mẫu hiển thị QR lên GitHub ✓", "ok");
     showToast("Đã lưu mẫu hiển thị QR lên GitHub ✓", "ok");
+    clearDirty("templates");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
@@ -778,6 +826,7 @@ function renderBankPickerList(idx, query) {
 }
 function selectBankForRow(idx, code) {
   applyBankToRow(idx, code);
+  markDirty("accounts");
   closeBankPicker();
   renderTable();
   populateQrAccounts();
@@ -929,6 +978,7 @@ function moveAccountRow(idx, dir) {
   state.accounts[idx] = state.accounts[newIdx];
   state.accounts[newIdx] = tmp;
   renumberAccountsStt();
+  markDirty("accounts");
   renderTable();
   populateQrAccounts();
 }
@@ -971,6 +1021,7 @@ function renderTable() {
       const idx = Number(e.target.dataset.idx);
       const field = e.target.dataset.field;
       state.accounts[idx][field] = e.target.value;
+      markDirty("accounts");
       populateQrAccounts();
     });
   });
@@ -998,6 +1049,7 @@ function renderTable() {
       const name = removedAcc.list_name;
       state.accounts.splice(idx, 1);
       renumberAccountsStt();
+      markDirty("accounts");
       renderTable();
       populateQrAccounts();
       showToast(`Đã xoá "${name}"`, "ok", {
@@ -1007,6 +1059,7 @@ function renderTable() {
           const restoreAt = Math.min(idx, state.accounts.length);
           state.accounts.splice(restoreAt, 0, removedAcc);
           renumberAccountsStt();
+          markDirty("accounts");
           renderTable();
           populateQrAccounts();
           showToast(`Đã khôi phục "${name}"`, "ok");
@@ -1039,6 +1092,7 @@ async function addRow() {
     data__short_name: defaultBank.short_name || "",
   });
   renumberAccountsStt();
+  markDirty("accounts");
   renderTable();
   populateQrAccounts();
 }
@@ -1248,17 +1302,38 @@ function renderMauList() {
 }
 
 // ---------- Cài đặt: Mẫu chuyển tiền (bảng sửa trực tiếp) ----------
+function mauAccountOptionsHtml(selectedIdx) {
+  let html = `<option value="">— Chọn tài khoản —</option>`;
+  html += state.accounts
+    .map((a, i) => {
+      const bank = a.data__shortName || a.data__name || a.data__code || "?";
+      const label = `${a.list_name || "(chưa đặt tên)"} — ${a.data_num || "?"} (${bank})`;
+      return `<option value="${i}" ${i === selectedIdx ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+  return html;
+}
 function renderMauTable() {
   const body = $("#mauTableBody");
   if (!body) return;
+  if (!state.accounts.length) {
+    setStatus($("#ghMsg"), 'Chưa có tài khoản nào — thêm ở tab "Tài khoản" trước khi tạo mẫu chuyển tiền.', "err");
+  }
   body.innerHTML = "";
   state.presets.forEach((p, idx) => {
+    const acc = findAccountForPreset(p);
+    const accIdx = acc ? state.accounts.indexOf(acc) : -1;
+    const unresolved = !acc && (p.accountName || p.accountNum);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Tên mẫu"><input data-mau-idx="${idx}" data-mau-field="name" value="${escapeAttr(p.name || "")}"></td>
-      <td data-label="Tài khoản"><input data-mau-idx="${idx}" data-mau-field="accountName" value="${escapeAttr(p.accountName || "")}"></td>
-      <td data-label="Số TK"><input data-mau-idx="${idx}" data-mau-field="accountNum" value="${escapeAttr(p.accountNum || "")}"></td>
+      <td data-label="Tài khoản">
+        <select data-mau-idx="${idx}" data-mau-field="accountSelect" class="${unresolved ? "input-err" : ""}" title="${unresolved ? "Không khớp tài khoản nào đã lưu — chọn lại" : ""}">
+          ${mauAccountOptionsHtml(accIdx)}
+        </select>
+      </td>
+      <td data-label="Số TK"><input data-mau-field="accountNumDisplay" value="${escapeAttr(p.accountNum || "")}" disabled></td>
       <td data-label="Số tiền"><input data-mau-idx="${idx}" data-mau-field="amount" inputmode="numeric" value="${escapeAttr(p.amount || "")}"></td>
       <td data-label="Nội dung"><input data-mau-idx="${idx}" data-mau-field="content" value="${escapeAttr(p.content || "")}"></td>
       <td data-label="Mẫu hiển thị"><input data-mau-idx="${idx}" data-mau-field="template" value="${escapeAttr(p.template || "")}"></td>
@@ -1278,7 +1353,21 @@ function renderMauTable() {
       if (!preset) return;
       preset[field] = field === "amount" ? Number(rawNumber(e.target.value)) || 0 : e.target.value;
       savePresetsCache();
-      if (field !== "amount") return;
+      markDirty("presets");
+    });
+  });
+  body.querySelectorAll("select[data-mau-field='accountSelect']").forEach((sel) => {
+    sel.addEventListener("change", (e) => {
+      const idx = Number(e.target.dataset.mauIdx);
+      const preset = state.presets[idx];
+      if (!preset) return;
+      const val = e.target.value;
+      const acc = val === "" ? null : state.accounts[Number(val)];
+      preset.accountName = acc ? acc.list_name : "";
+      preset.accountNum = acc ? acc.data_num : "";
+      savePresetsCache();
+      markDirty("presets");
+      renderMauTable();
     });
   });
   body.querySelectorAll("[data-mau-tbl-del]").forEach((btn) => {
@@ -1319,6 +1408,7 @@ async function refreshVietqrBanksTab() {
 function addMauRow() {
   state.presets.push({ name: "", accountName: "", accountNum: "", amount: 0, content: "", template: "" });
   savePresetsCache();
+  markDirty("presets");
   renderMauList();
   const inputs = $("#mauTableBody").querySelectorAll("input[data-mau-field='name']");
   const last = inputs[inputs.length - 1];
@@ -1389,6 +1479,7 @@ function deleteMauPreset(idx) {
     state.selectedPresetIdx -= 1;
   }
   savePresetsCache();
+  markDirty("presets");
   renderMauList();
   updateMauActiveUi();
   saveFormState();
@@ -1399,6 +1490,7 @@ function deleteMauPreset(idx) {
       const restoreAt = Math.min(idx, state.presets.length);
       state.presets.splice(restoreAt, 0, removed);
       savePresetsCache();
+      markDirty("presets");
       renderMauList();
       showToast(`Đã khôi phục "${name}"`, "ok");
     },
@@ -1425,6 +1517,7 @@ function saveCurrentFormAsPreset() {
     template: $("#qrTemplate").value,
   });
   savePresetsCache();
+  markDirty("presets");
   state.selectedPresetIdx = state.presets.length - 1;
   renderMauList();
   updateMauActiveUi();
@@ -1444,6 +1537,7 @@ function updateSelectedPreset() {
   preset.content = $("#qrContent").value.trim();
   preset.template = $("#qrTemplate").value;
   savePresetsCache();
+  markDirty("presets");
   renderMauList();
   updateMauActiveUi();
   showToast(`Đã cập nhật mẫu "${preset.name}"`, "ok");
@@ -1671,6 +1765,7 @@ function renderContentTable() {
       const idx = Number(e.target.dataset.contentIdx);
       state.content[idx] = e.target.value;
       saveContentCache();
+      markDirty("content");
       renderContentSuggestions();
     });
   });
@@ -1680,6 +1775,7 @@ function renderContentTable() {
       const removed = state.content[idx];
       state.content.splice(idx, 1);
       saveContentCache();
+      markDirty("content");
       renderContentTable();
       renderContentSuggestions();
       showToast(`Đã xoá "${removed}"`, "ok", {
@@ -1689,6 +1785,7 @@ function renderContentTable() {
           const restoreAt = Math.min(idx, state.content.length);
           state.content.splice(restoreAt, 0, removed);
           saveContentCache();
+          markDirty("content");
           renderContentTable();
           renderContentSuggestions();
           showToast(`Đã khôi phục "${removed}"`, "ok");
@@ -1700,6 +1797,7 @@ function renderContentTable() {
 function addContentRow() {
   state.content.push("");
   saveContentCache();
+  markDirty("content");
   renderContentTable();
   const inputs = $("#contentTableBody").querySelectorAll("input[data-content-idx]");
   const last = inputs[inputs.length - 1];
@@ -1731,6 +1829,7 @@ function renderTemplatesTable() {
       const field = e.target.dataset.tplField;
       state.templates[idx][field] = e.target.value;
       saveTemplatesCache();
+      markDirty("templates");
       populateQrTemplateOptions();
     });
   });
@@ -1740,6 +1839,7 @@ function renderTemplatesTable() {
       const removed = state.templates[idx];
       state.templates.splice(idx, 1);
       saveTemplatesCache();
+      markDirty("templates");
       renderTemplatesTable();
       populateQrTemplateOptions();
       showToast(`Đã xoá "${removed.label || removed.value}"`, "ok", {
@@ -1749,6 +1849,7 @@ function renderTemplatesTable() {
           const restoreAt = Math.min(idx, state.templates.length);
           state.templates.splice(restoreAt, 0, removed);
           saveTemplatesCache();
+          markDirty("templates");
           renderTemplatesTable();
           populateQrTemplateOptions();
           showToast(`Đã khôi phục "${removed.label || removed.value}"`, "ok");
@@ -1760,6 +1861,7 @@ function renderTemplatesTable() {
 function addTemplateRow() {
   state.templates.push({ value: "", label: "" });
   saveTemplatesCache();
+  markDirty("templates");
   renderTemplatesTable();
   const inputs = $("#templatesTableBody").querySelectorAll("input[data-tpl-field='value']");
   const last = inputs[inputs.length - 1];
@@ -1775,18 +1877,11 @@ function switchWorkspaceTab(tabName) {
 }
 
 // ---------- Settings modal (danh sách tài khoản + kết nối GitHub) ----------
-// Chuyển tab: chốt chiều cao hiện tại của viewport, đổi nội dung, rồi animate
-// mượt sang chiều cao thật của tab mới (thay vì để CSS ép 1 chiều cao cố định
-// gây khoảng trắng thừa ở tab ngắn, hoặc để khung nhảy khựng khi tab dài/ngắn
-// khác nhau). Sau khi animate xong, trả viewport về height:auto để các thay
-// đổi sau đó trong cùng tab (thêm/xoá dòng) tự co giãn bình thường.
+// Khung cửa sổ Cài đặt có chiều cao CỐ ĐỊNH bằng CSS (.gh-panel.settings-panel),
+// nên chuyển tab chỉ cần ẩn/hiện panel — không cần animate chiều cao bằng JS nữa
+// (cách cũ hay bị nhảy/co rồi mất nội dung khi chuyển tab nhanh).
 function switchSettingsTab(tabName) {
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
-
-  const viewport = $("#settingsTabsViewport");
-  if (viewport) {
-    viewport.style.height = viewport.getBoundingClientRect().height + "px";
-  }
 
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
   $("#settingsTabContent").hidden = tabName !== "content";
@@ -1799,18 +1894,6 @@ function switchSettingsTab(tabName) {
   if (tabName === "templates") renderTemplatesTable();
   if (tabName === "mau") renderMauTable();
   if (tabName === "vietqr") renderVietqrBanksTable();
-
-  if (viewport) {
-    const activePanel = viewport.querySelector(".settings-tab-panel:not([hidden])");
-    requestAnimationFrame(() => {
-      if (!activePanel) return;
-      viewport.style.height = activePanel.getBoundingClientRect().height + "px";
-      clearTimeout(viewport._heightResetTimer);
-      viewport._heightResetTimer = setTimeout(() => {
-        viewport.style.height = "auto";
-      }, 240);
-    });
-  }
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;

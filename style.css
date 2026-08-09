@@ -75,7 +75,10 @@ body{
   background:
     radial-gradient(900px 480px at 15% -8%, var(--glow-1), transparent 60%),
     radial-gradient(700px 420px at 100% 0%, var(--glow-2), transparent 55%),
+    radial-gradient(800px 500px at 8% 100%, var(--glow-2), transparent 60%),
+    radial-gradient(760px 460px at 92% 92%, var(--glow-1), transparent 60%),
     var(--bg);
+  background-attachment:fixed;
   font-size:14px;
 }
 @media (prefers-reduced-motion: reduce){
@@ -192,12 +195,12 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,.bank-picker-popup,
   border-radius:var(--radius);padding:18px 20px 20px;
   box-shadow:0 20px 60px rgba(0,0,0,.5);
 }
-/* Cửa sổ Cài đặt: cao theo ĐÚNG nội dung của từng tab (không còn khung cố
-   định gây khoảng trắng thừa ở tab ngắn như "Kết nối GitHub"). Để chuyển tab
-   không bị "khựng" nhảy kích thước, phần viewport bên dưới được animate chiều
-   cao mượt bằng JS (switchSettingsTab trong app.js) thay vì set cứng bằng CSS. */
+/* Cửa sổ Cài đặt: khung CỐ ĐỊNH chiều cao — chuyển tab không làm modal
+   nhảy/co giãn kích thước nữa. Mỗi tab tự cuộn riêng bên trong nếu nội dung
+   dài hơn khung (vd. bảng tài khoản nhiều dòng). */
 .gh-panel.settings-panel{
   max-width:900px;
+  height:min(640px, 88vh);
   max-height:88vh;
   display:flex;flex-direction:column;
   overflow:hidden;
@@ -205,19 +208,26 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,.bank-picker-popup,
 .gh-panel.settings-panel .gh-panel-head{flex:none;}
 .settings-tabs{margin-top:2px;flex:none;}
 .settings-tabs-viewport{
-  flex:none;overflow:hidden;
-  transition:height .22s cubic-bezier(.22,.8,.32,1);
+  flex:1 1 auto;
+  min-height:0;
+  overflow:hidden;
 }
-/* Mỗi tab tự giới hạn chiều cao tối đa + tự cuộn riêng nếu nội dung quá dài
-   (vd. bảng tài khoản nhiều dòng), để 1 tab dài không kéo cả cửa sổ giãn to. */
 .settings-tab-panel{
   padding-top:14px;padding-bottom:4px;
-  max-height:min(540px, 68vh);overflow-y:auto;
+  height:100%;overflow-y:auto;
 }
 .settings-tab-panel[hidden]{display:none;}
 /* Tab GitHub có ít trường nhập hơn hẳn 3 tab bảng còn lại — giới hạn bề rộng
    và canh giữa để input không bị kéo dãn hết 900px, trông trống trải. */
 #settingsTabGithub{max-width:620px;width:100%;margin-left:auto;margin-right:auto;}
+/* Chấm cam nhỏ trên tab khi có thay đổi CHƯA lưu lên GitHub — giúp biết
+   ngay chỗ nào (thêm/sửa/xoá dòng) còn đang nằm ở local, chưa đẩy lên repo. */
+.tabs .tab.has-unsaved{position:relative;}
+.tabs .tab.has-unsaved::after{
+  content:"";position:absolute;top:6px;right:8px;
+  width:6px;height:6px;border-radius:50%;
+  background:#F5A623;box-shadow:0 0 0 2px var(--panel);
+}
 .confirm-panel{max-width:340px;text-align:center;padding:22px 22px 20px;}
 .confirm-message{margin:0 0 16px;font-size:13.5px;color:var(--ink);line-height:1.5;}
 .confirm-actions{margin-top:0;justify-content:center;}
@@ -325,9 +335,11 @@ thead th{
 tbody td{padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
 tbody tr:hover{background:var(--panel-2);}
-td input{width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 7px;font-size:12.5px;color:var(--ink);transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;}
-td input:hover{border-color:var(--border-strong);}
-td input:focus{background:var(--bg);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash);}
+td input,td select{width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 7px;font-size:12.5px;color:var(--ink);transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;font-family:inherit;}
+td input:hover,td select:hover{border-color:var(--border-strong);}
+td input:focus,td select:focus{background:var(--bg);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash);}
+td input:disabled{color:var(--ink-faint);background:var(--panel-2);cursor:not-allowed;}
+td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,105,79,.14);}
 .row-actions{display:flex;gap:4px;justify-content:flex-end;}
 .icon-btn{
   background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);

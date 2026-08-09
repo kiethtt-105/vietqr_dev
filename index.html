@@ -225,35 +225,34 @@
               <button class="btn subtle" id="btnGhCheck" type="button">Kiểm tra kết nối</button>
               <span class="status inline" id="ghCheckMsg"></span>
             </div>
-            <p class="hint">⚠ Token lưu dạng plaintext trên trình duyệt. Dùng fine-grained token, chỉ cấp quyền cho 1 repo.</p>
           </label>
         </div>
 
-        <details class="details-toggle">
-          <summary>Advanced Options</summary>
-          <div class="gh-grid" style="margin-top:10px;">
-            <label>
-              <span>Branch</span>
-              <input id="ghBranch" type="text" placeholder="main" value="main">
-            </label>
-            <label>
-              <span>File tài khoản cá nhân</span>
-              <input id="ghPathAccounts" type="text" value="data/my-accounts.json">
-            </label>
-            <label>
-              <span>File mẫu chuyển tiền</span>
-              <input id="ghPathPresets" type="text" value="data/mau-chuyen-tien.json">
-            </label>
-            <label>
-              <span>File nội dung chuyển khoản</span>
-              <input id="ghPathContent" type="text" value="data/noi-dung-chuyen-khoan.json">
-            </label>
-            <label>
-              <span>File mẫu hiển thị QR</span>
-              <input id="ghPathTemplates" type="text" value="data/templates.json">
-            </label>
-          </div>
-        </details>
+        <!-- Branch/đường dẫn file: dùng giá trị mặc định, ẩn khỏi giao diện cho gọn.
+             Vẫn giữ input trong DOM (hidden) để app.js đọc/ghi state.gh bình thường,
+             không phải sửa lại toàn bộ logic đọc $("#ghXxx").value. -->
+        <div class="gh-grid" hidden>
+          <label>
+            <span>Branch</span>
+            <input id="ghBranch" type="text" placeholder="main" value="main">
+          </label>
+          <label>
+            <span>File tài khoản cá nhân</span>
+            <input id="ghPathAccounts" type="text" value="data/my-accounts.json">
+          </label>
+          <label>
+            <span>File mẫu chuyển tiền</span>
+            <input id="ghPathPresets" type="text" value="data/mau-chuyen-tien.json">
+          </label>
+          <label>
+            <span>File nội dung chuyển khoản</span>
+            <input id="ghPathContent" type="text" value="data/noi-dung-chuyen-khoan.json">
+          </label>
+          <label>
+            <span>File mẫu hiển thị QR</span>
+            <input id="ghPathTemplates" type="text" value="data/templates.json">
+          </label>
+        </div>
 
         <div class="gh-actions">
           <button class="btn primary" id="btnGhSave" type="button">Lưu thông tin kết nối</button>
