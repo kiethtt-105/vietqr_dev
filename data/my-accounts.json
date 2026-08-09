@@ -128,5 +128,18 @@
     "data__logo": "https://cdn.vietqr.io/img/VPB.png",
     "data__short_name": "VPBank",
     "stt": 10
+  },
+  {
+    "data__id": 17,
+    "list_name": "VIB 064933000",
+    "data_num": "064933000",
+    "name_ac": "Huynh Tran Tuan Kiet",
+    "data__name": "VietinBank",
+    "data__code": "ICB",
+    "data__bin": "970415",
+    "data__shortName": "VietinBank",
+    "data__logo": "https://cdn.vietqr.io/img/ICB.png",
+    "data__short_name": "VietinBank",
+    "stt": 11
   }
 ]
