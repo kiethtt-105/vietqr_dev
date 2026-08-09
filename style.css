@@ -335,7 +335,7 @@ thead th{
 tbody td{padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
 tbody tr:hover{background:var(--panel-2);}
-td input,td select{width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 7px;font-size:12.5px;color:var(--ink);transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;font-family:inherit;}
+td input,td select{width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 7px;font-size:12.5px;color:var(--ink);transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;font-family:inherit;text-overflow:ellipsis;}
 td input:hover,td select:hover{border-color:var(--border-strong);}
 td input:focus,td select:focus{background:var(--bg);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash);}
 td input:disabled{color:var(--ink-faint);background:var(--panel-2);cursor:not-allowed;}
@@ -343,10 +343,16 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,105
 .row-actions{display:flex;gap:4px;justify-content:flex-end;}
 .icon-btn{
   background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
-  color:var(--ink-dim);width:26px;height:26px;cursor:pointer;font-size:12px;
-  display:grid;place-items:center;
+  color:var(--ink-dim);width:26px;height:26px;min-width:26px;min-height:26px;cursor:pointer;font-size:12px;
+  display:grid;place-items:center;flex:0 0 auto;
   transition:border-color .15s ease, color .15s ease, background-color .15s ease, transform .12s ease;
 }
+/* Đảm bảo mọi nút icon/mũi tên không bị co lại (0 chiều rộng) hay bị đè
+   khi nằm trong hàng flex hẹp — nguyên nhân khiến icon "biến mất"/bị che. */
+.btn.icon-only,.combo-toggle,.eye-btn,.mau-active-clear,.mau-card-star,.mau-card-del,
+.row-actions,.panel-head-actions>.btn,.panel-head-actions>.icon-btn{flex:0 0 auto;}
+.combo-toggle,.eye-btn{z-index:2;}
+.panel-head-actions{flex-wrap:wrap;row-gap:8px;}
 .icon-btn:hover{border-color:var(--danger);color:var(--danger);transform:translateY(-1px);}
 .icon-btn:active{transform:scale(.92);}
 .icon-btn.order-btn{font-size:10px;color:var(--ink-faint);}
@@ -403,6 +409,18 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,105
   border:1px dashed var(--border);border-radius:var(--radius-sm);margin:10px 0 12px;
 }
 
+/* Khoá các form quản lý dữ liệu trong Cài đặt cho tới khi trình duyệt đã
+   nhập Personal Access Token GitHub — tránh chỉnh sửa "ma" không lưu được
+   và lộ dữ liệu tài khoản trên máy chưa xác thực. */
+.settings-lock-hint{
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;line-height:1.5;color:var(--ink-dim);
+  background:var(--gold-wash);border:1px dashed var(--gold);border-radius:var(--radius-sm);
+  padding:12px 14px;margin-bottom:12px;
+}
+.settings-lock-hint strong{color:var(--gold-bright);}
+.settings-lock-hint[hidden]{display:none;}
+
 .qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
 .qr-form{display:flex;flex-direction:column;gap:14px;}
 
@@ -451,6 +469,15 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,105
 .field-counter{font-size:10.5px;color:var(--ink-faint);text-align:right;margin-top:3px;}
 .field-counter.warn{color:var(--accent-bright);}
 .field-counter.err{color:var(--danger);}
+
+/* Xem trước đầy đủ nội dung chuyển khoản khi chuỗi dài hơn ô nhập —
+   tránh trường hợp phần đầu/giữa nội dung bị che khuất trong ô input. */
+.qr-content-preview{
+  margin-top:5px;font-size:11px;line-height:1.5;color:var(--ink-dim);
+  background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:6px 9px;word-break:break-word;white-space:pre-wrap;
+}
+.qr-content-preview[hidden]{display:none;}
 
 .combo-wrap{position:relative;display:flex;}
 .combo-wrap input{flex:1;padding-right:34px;}

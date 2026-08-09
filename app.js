@@ -4,6 +4,7 @@ const LS_ACCOUNTS_CACHE = "vietqr_accounts_cache";
 const LS_PRESETS_CACHE = "vietqr_presets_cache";
 const LS_CONTENT_CACHE = "vietqr_content_cache";
 const LS_TEMPLATES_CACHE = "vietqr_templates_cache";
+const LS_AMOUNTS_CACHE = "vietqr_amounts_cache";
 const LS_DEFAULTS = "vietqr_defaults";
 const LS_FORM_STATE = "vietqr_form_state";
 const LS_REFBANKS_CACHE = "vietqr_refbanks_cache";
@@ -22,17 +23,22 @@ const DEFAULT_QR_TEMPLATES = [
   { value: "qr_only", label: "Chỉ mã QR" },
 ];
 
+// Giá trị mặc định cho các nút "số tiền nhanh" khi chưa có data/so-tien-goi-y.json
+// và chưa từng lưu gì (dùng làm fallback), tương tự DEFAULT_QR_TEMPLATES ở trên.
+const DEFAULT_SUGGESTED_AMOUNTS = [20000, 50000, 100000, 200000, 500000, 1000000];
+
 let state = {
   refBanks: [],
   accounts: [],
   presets: [],
   content: [],
   templates: [],
+  amounts: [],
   selectedPresetIdx: null,
-  sha: { accounts: null, presets: null, content: null, templates: null },
+  sha: { accounts: null, presets: null, content: null, templates: null, amounts: null },
   // Đánh dấu phần dữ liệu nào đang có thay đổi (thêm/sửa/xoá) ở local mà
   // CHƯA được lưu lên GitHub — hiện chấm cam trên tab tương ứng để dễ nhận biết.
-  dirty: { accounts: false, presets: false, content: false, templates: false },
+  dirty: { accounts: false, presets: false, content: false, templates: false, amounts: false },
   gh: {
     owner: "",
     repo: "",
@@ -41,6 +47,7 @@ let state = {
     pathPresets: "data/mau-chuyen-tien.json",
     pathContent: "data/noi-dung-chuyen-khoan.json",
     pathTemplates: "data/templates.json",
+    pathAmounts: "data/so-tien-goi-y.json",
   },
 };
 
@@ -175,6 +182,7 @@ function updateDirtyIndicators() {
     content: '.settings-tabs .tab[data-settings-tab="content"]',
     templates: '.settings-tabs .tab[data-settings-tab="templates"]',
     presets: '.settings-tabs .tab[data-settings-tab="mau"]',
+    amounts: '.settings-tabs .tab[data-settings-tab="amounts"]',
   };
   Object.keys(map).forEach((key) => {
     const el = $(map[key]);
@@ -214,6 +222,7 @@ function loadGhConfigFromStorage() {
   $("#ghPathPresets").value = state.gh.pathPresets || "data/mau-chuyen-tien.json";
   $("#ghPathContent").value = state.gh.pathContent || "data/noi-dung-chuyen-khoan.json";
   $("#ghPathTemplates").value = state.gh.pathTemplates || "data/templates.json";
+  $("#ghPathAmounts").value = state.gh.pathAmounts || "data/so-tien-goi-y.json";
   $("#ghToken").value = localStorage.getItem(LS_GH_TOKEN) || "";
   updateGhStatusLabel();
 }
@@ -231,6 +240,7 @@ function syncGhInputsToState() {
   state.gh.pathPresets = $("#ghPathPresets").value.trim() || state.gh.pathPresets || "data/mau-chuyen-tien.json";
   state.gh.pathContent = $("#ghPathContent").value.trim() || state.gh.pathContent || "data/noi-dung-chuyen-khoan.json";
   state.gh.pathTemplates = $("#ghPathTemplates").value.trim() || state.gh.pathTemplates || "data/templates.json";
+  state.gh.pathAmounts = $("#ghPathAmounts").value.trim() || state.gh.pathAmounts || "data/so-tien-goi-y.json";
   const token = $("#ghToken").value.trim();
   if (token) localStorage.setItem(LS_GH_TOKEN, token);
   localStorage.setItem(LS_GH_CONFIG, JSON.stringify(state.gh));
@@ -238,6 +248,7 @@ function syncGhInputsToState() {
 function saveGhConfigToStorage() {
   syncGhInputsToState();
   updateGhStatusLabel();
+  applySettingsLock();
   setStatus($("#ghMsg"), "Đã lưu thông tin kết nối trên trình duyệt này.", "ok");
 }
 function getToken() {
@@ -402,18 +413,26 @@ async function loadAllFromGithub() {
       state.sha.templates = templates.sha;
       saveTemplatesCache();
     }
+    const amounts = await ghReadJson(state.gh.pathAmounts);
+    if (amounts.data) {
+      state.amounts = Array.isArray(amounts.data) && amounts.data.length ? amounts.data.filter((v) => Number(v) > 0) : DEFAULT_SUGGESTED_AMOUNTS.slice();
+      state.sha.amounts = amounts.sha;
+      saveAmountsCache();
+    }
     renderTable();
     populateQrAccounts();
     renderMauList();
     populateQrTemplateOptions();
     renderContentSuggestions();
+    renderQuickAmountsChips();
     clearDirty("accounts");
     clearDirty("presets");
     clearDirty("content");
     clearDirty("templates");
+    clearDirty("amounts");
     setStatus(
       $("#ghMsg"),
-      `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền, ${state.content.length} nội dung, ${state.templates.length} mẫu hiển thị.`,
+      `Đã tải ${state.accounts.length} tài khoản, ${state.presets.length} mẫu chuyển tiền, ${state.content.length} nội dung, ${state.templates.length} mẫu hiển thị, ${state.amounts.length} số tiền gợi ý.`,
       "ok"
     );
     $("#ghDot").className = "dot on";
@@ -457,17 +476,26 @@ async function syncFromGithubSilently() {
       saveTemplatesCache();
       changed = true;
     }
+    const amounts = await ghReadJson(state.gh.pathAmounts);
+    if (amounts.data) {
+      state.amounts = Array.isArray(amounts.data) && amounts.data.length ? amounts.data.filter((v) => Number(v) > 0) : DEFAULT_SUGGESTED_AMOUNTS.slice();
+      state.sha.amounts = amounts.sha;
+      saveAmountsCache();
+      changed = true;
+    }
     if (changed) {
       renderTable();
       populateQrAccounts();
       renderMauList();
       populateQrTemplateOptions();
       renderContentSuggestions();
+      renderQuickAmountsChips();
       updateMauActiveUi();
       clearDirty("accounts");
       clearDirty("presets");
       clearDirty("content");
       clearDirty("templates");
+      clearDirty("amounts");
       onGenerateQr(null, { silent: true });
     }
     $("#ghDot").className = "dot on";
@@ -722,6 +750,15 @@ async function fetchRefBanksFromApi() {
   return mapVietQrApiBanks(payload);
 }
 async function loadRefBanks() {
+  // Ưu tiên cache trong trình duyệt nếu còn hạn (vd. vừa bấm "Làm mới ngân
+  // hàng" trước đó) — tránh trường hợp bấm làm mới xong nhưng load lại trang
+  // thì dữ liệu lại quay về file tĩnh cũ trong repo (không phản ánh đúng số
+  // ngân hàng mới nhất lấy từ API VietQR).
+  const cached = readRefBanksCache();
+  if (cached && Date.now() - cached.fetchedAt < REFBANKS_TTL_MS) {
+    state.refBanks = cached.data;
+    return;
+  }
 
   try {
     const res = await fetch("data/vietqr-banks.json");
@@ -734,11 +771,6 @@ async function loadRefBanks() {
     throw new Error("empty local file");
   } catch (e) {
 
-  }
-  const cached = readRefBanksCache();
-  if (cached && Date.now() - cached.fetchedAt < REFBANKS_TTL_MS) {
-    state.refBanks = cached.data;
-    return;
   }
   try {
     const banks = await fetchRefBanksFromApi();
@@ -929,6 +961,32 @@ function saveContentCache() {
   localStorage.setItem(LS_CONTENT_CACHE, JSON.stringify(state.content));
 }
 
+// ---------- Số tiền gợi ý (nút bấm nhanh) cache + load ----------
+function loadAmountsCache() {
+  const cached = localStorage.getItem(LS_AMOUNTS_CACHE);
+  if (cached) {
+    try {
+      state.amounts = JSON.parse(cached);
+      return;
+    } catch (e) {}
+  }
+}
+async function loadAmountsInitial() {
+  loadAmountsCache();
+  if (state.amounts.length) return;
+  try {
+    const res = await fetch("data/so-tien-goi-y.json");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) state.amounts = data.filter((v) => Number(v) > 0);
+    }
+  } catch (e) {}
+  if (!state.amounts.length) state.amounts = DEFAULT_SUGGESTED_AMOUNTS.slice();
+}
+function saveAmountsCache() {
+  localStorage.setItem(LS_AMOUNTS_CACHE, JSON.stringify(state.amounts));
+}
+
 // ---------- Mẫu hiển thị QR cache + load ----------
 function loadTemplatesCache() {
   const cached = localStorage.getItem(LS_TEMPLATES_CACHE);
@@ -1005,9 +1063,9 @@ function renderTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Tên gợi nhớ"><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}"></td>
-      <td data-label="Số tài khoản"><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}"></td>
-      <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}"></td>
+      <td data-label="Tên gợi nhớ"><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}" title="${escapeAttr(acc.list_name)}"></td>
+      <td data-label="Số tài khoản"><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}" title="${escapeAttr(acc.data_num)}"></td>
+      <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}" title="${escapeAttr(acc.name_ac)}"></td>
       <td data-label="Ngân hàng">
         <input type="text" class="bank-input" data-idx="${idx}" autocomplete="off"
           placeholder="🔎 Tìm ngân hàng…" value="${escapeAttr(bankLabelForRow(acc))}">
@@ -1344,14 +1402,14 @@ function renderMauTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Tên mẫu"><input data-mau-idx="${idx}" data-mau-field="name" value="${escapeAttr(p.name || "")}"></td>
+      <td data-label="Tên mẫu"><input data-mau-idx="${idx}" data-mau-field="name" value="${escapeAttr(p.name || "")}" title="${escapeAttr(p.name || "")}"></td>
       <td data-label="Tài khoản">
         <select data-mau-idx="${idx}" data-mau-field="accountSelect" class="${unresolved ? "input-err" : ""}" title="${unresolved ? "Không khớp tài khoản nào đã lưu — chọn lại" : ""}">
           ${mauAccountOptionsHtml(accIdx)}
         </select>
       </td>
       <td data-label="Số tiền"><input data-mau-idx="${idx}" data-mau-field="amount" inputmode="numeric" value="${escapeAttr(p.amount || "")}"></td>
-      <td data-label="Nội dung"><input data-mau-idx="${idx}" data-mau-field="content" value="${escapeAttr(p.content || "")}"></td>
+      <td data-label="Nội dung"><input data-mau-idx="${idx}" data-mau-field="content" value="${escapeAttr(p.content || "")}" title="${escapeAttr(p.content || "")}"></td>
       <td data-label="Mẫu hiển thị">
         <select data-mau-idx="${idx}" data-mau-field="templateSelect" class="${tplUnresolved ? "input-err" : ""}" title="${tplUnresolved ? "Mẫu hiển thị này không còn tồn tại — chọn lại" : ""}">
           ${mauTemplateOptionsHtml(p.template)}
@@ -1622,10 +1680,30 @@ function validateAmount(rawAmount) {
 }
 function updateContentCounter(content) {
   const counter = $("#qrContentCounter");
-  if (!counter) return;
-  const len = content.length;
-  counter.textContent = `${len}/${ADDINFO_SOFT_LIMIT}`;
-  counter.className = "field-counter" + (len > ADDINFO_SOFT_LIMIT ? " err" : len > ADDINFO_SOFT_LIMIT - 5 ? " warn" : "");
+  if (counter) {
+    const len = content.length;
+    counter.textContent = `${len}/${ADDINFO_SOFT_LIMIT}`;
+    counter.className = "field-counter" + (len > ADDINFO_SOFT_LIMIT ? " err" : len > ADDINFO_SOFT_LIMIT - 5 ? " warn" : "");
+  }
+  updateContentPreview(content);
+}
+// Ô nhập nội dung có bề rộng cố định — khi gõ nội dung dài, phần đầu/giữa
+// chuỗi có thể bị cuộn khuất khỏi tầm nhìn. Hiển thị thêm 1 dòng xem trước
+// đầy đủ (wrap xuống dòng) bên dưới ô nhập để luôn thấy trọn nội dung, và
+// đồng thời gắn "title" để hiện tooltip đầy đủ khi rê chuột vào ô nhập.
+function updateContentPreview(content) {
+  const input = $("#qrContent");
+  const preview = $("#qrContentPreview");
+  if (input) input.title = content || "";
+  if (!preview) return;
+  const overflowing = input && input.scrollWidth > input.clientWidth + 1;
+  if (content && overflowing) {
+    preview.textContent = content;
+    preview.hidden = false;
+  } else {
+    preview.textContent = "";
+    preview.hidden = true;
+  }
 }
 
 // ---------- Gợi ý số tiền theo con số đang gõ ----------
@@ -1782,7 +1860,7 @@ function renderContentTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Nội dung gợi ý"><input data-content-idx="${idx}" value="${escapeAttr(text)}"></td>
+      <td data-label="Nội dung gợi ý"><input data-content-idx="${idx}" value="${escapeAttr(text)}" title="${escapeAttr(text)}"></td>
       <td class="row-actions">
         <button class="icon-btn" title="Xoá dòng" data-content-del="${idx}">✕</button>
       </td>`;
@@ -1835,6 +1913,137 @@ function addContentRow() {
   if (last) last.focus();
 }
 
+// ---------- Cài đặt: Số tiền gợi ý (bảng quản lý) ----------
+function renderAmountsTable() {
+  const body = $("#amountsTableBody");
+  if (!body) return;
+  body.innerHTML = "";
+  state.amounts.forEach((amount, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
+      <td data-label="Số tiền gợi ý (đ)"><input data-amount-idx="${idx}" inputmode="numeric" value="${escapeAttr(formatNumber(amount))}" title="${escapeAttr(formatNumber(amount))}"></td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Xoá dòng" data-amount-del="${idx}">✕</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+  const countEl = $("#amountsCount");
+  if (countEl) countEl.textContent = `${state.amounts.length} dòng`;
+
+  body.querySelectorAll("input[data-amount-idx]").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      e.target.value = formatNumber(e.target.value);
+      e.target.title = e.target.value;
+      const idx = Number(e.target.dataset.amountIdx);
+      state.amounts[idx] = Number(rawNumber(e.target.value)) || 0;
+      saveAmountsCache();
+      markDirty("amounts");
+      renderQuickAmountsChips();
+    });
+  });
+  body.querySelectorAll("[data-amount-del]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.target.dataset.amountDel);
+      const removed = state.amounts[idx];
+      state.amounts.splice(idx, 1);
+      saveAmountsCache();
+      markDirty("amounts");
+      renderAmountsTable();
+      renderQuickAmountsChips();
+      showToast(`Đã xoá ${formatNumber(removed)}đ`, "ok", {
+        duration: 5000,
+        actionLabel: "Hoàn tác",
+        onAction: () => {
+          const restoreAt = Math.min(idx, state.amounts.length);
+          state.amounts.splice(restoreAt, 0, removed);
+          saveAmountsCache();
+          markDirty("amounts");
+          renderAmountsTable();
+          renderQuickAmountsChips();
+          showToast(`Đã khôi phục ${formatNumber(removed)}đ`, "ok");
+        },
+      });
+    });
+  });
+}
+function addAmountRow() {
+  state.amounts.push(0);
+  saveAmountsCache();
+  markDirty("amounts");
+  renderAmountsTable();
+  const inputs = $("#amountsTableBody").querySelectorAll("input[data-amount-idx]");
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
+}
+async function saveAmountsToGithub() {
+  syncGhInputsToState();
+  if (!state.gh.owner || !state.gh.repo) {
+    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
+    openSettingsModal("github");
+    return;
+  }
+  if (!state.amounts.length) {
+    const ok = await showConfirm(
+      "Danh sách số tiền gợi ý đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu đang có trên GitHub. Vẫn tiếp tục?",
+      "Vẫn lưu (xoá hết)"
+    );
+    if (!ok) return;
+  }
+  const invalidRows = state.amounts.map((a, i) => (Number(a) > 0 ? null : i + 1)).filter((n) => n != null);
+  if (invalidRows.length) {
+    showToast(`Dòng ${invalidRows.join(", ")} chưa hợp lệ — điền số tiền lớn hơn 0.`, "err");
+    return;
+  }
+  const btn = $("#btnSaveAmountsGithub");
+  btn.classList.add("is-loading");
+  btn.disabled = true;
+  setStatus($("#ghMsg"), "Đang lưu số tiền gợi ý lên GitHub…");
+  try {
+    state.sha.amounts = await ghWriteJson(
+      state.gh.pathAmounts,
+      state.amounts,
+      state.sha.amounts,
+      `chore: cập nhật so-tien-goi-y.json (${new Date().toISOString()})`
+    );
+    setStatus($("#ghMsg"), "Đã lưu số tiền gợi ý lên GitHub ✓", "ok");
+    showToast("Đã lưu số tiền gợi ý lên GitHub ✓", "ok");
+    clearDirty("amounts");
+  } catch (err) {
+    console.error(err);
+    setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
+    showToast("Lỗi khi lưu lên GitHub", "err");
+    openSettingsModal("github");
+  } finally {
+    btn.classList.remove("is-loading");
+    btn.disabled = false;
+  }
+}
+
+// ---------- Nút "số tiền nhanh" trên form — nay lấy từ state.amounts (JSON quản lý được) ----------
+function renderQuickAmountsChips() {
+  const wrap = $("#quickAmounts");
+  if (!wrap) return;
+  const list = state.amounts && state.amounts.length ? state.amounts : DEFAULT_SUGGESTED_AMOUNTS;
+  wrap.innerHTML = list
+    .map((v) => `<button type="button" class="chip" data-val="${v}">${formatCompactAmount(v)}</button>`)
+    .join("");
+  wrap.querySelectorAll(".chip[data-val]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      $("#qrAmount").value = formatNumber(chip.dataset.val);
+      onGenerateQr(null, { silent: true });
+    });
+  });
+}
+function formatCompactAmount(v) {
+  const n = Number(v) || 0;
+  if (n >= 1_000_000 && n % 1_000_000 === 0) return `${n / 1_000_000}Tr`;
+  if (n >= 1000 && n % 1000 === 0) return `${n / 1000}K`;
+  return formatNumber(n);
+}
+
 // ---------- Cài đặt: Mẫu hiển thị QR (bảng quản lý) ----------
 function renderTemplatesTable() {
   const body = $("#templatesTableBody");
@@ -1844,8 +2053,8 @@ function renderTemplatesTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}"></td>
-      <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}"></td>
+      <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}" title="${escapeAttr(t.value)}"></td>
+      <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"></td>
       <td class="row-actions">
         <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
       </td>`;
@@ -1916,19 +2125,49 @@ function switchSettingsTab(tabName) {
 
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
   $("#settingsTabContent").hidden = tabName !== "content";
+  $("#settingsTabAmounts").hidden = tabName !== "amounts";
   $("#settingsTabTemplates").hidden = tabName !== "templates";
   $("#settingsTabMau").hidden = tabName !== "mau";
   $("#settingsTabVietqrBanks").hidden = tabName !== "vietqr";
   $("#settingsTabGithub").hidden = tabName !== "github";
   if (tabName === "accounts") renderTable();
   if (tabName === "content") renderContentTable();
+  if (tabName === "amounts") renderAmountsTable();
   if (tabName === "templates") renderTemplatesTable();
   if (tabName === "mau") renderMauTable();
   if (tabName === "vietqr") renderVietqrBanksTable();
+  applySettingsLock();
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;
   switchSettingsTab(tabName || "accounts");
+}
+
+// ---------- Khoá form quản lý dữ liệu khi trình duyệt CHƯA nhập token GitHub ----------
+// Yêu cầu: chỉ trình duyệt đã lưu Personal Access Token mới được xem/sửa các
+// bảng dữ liệu (tài khoản, nội dung, số tiền gợi ý, mẫu hiển thị, mẫu chuyển tiền)
+// trong Cài đặt — tránh lộ/sửa nhầm dữ liệu trên máy chưa xác thực.
+const SETTINGS_GATED_PANEL_IDS = ["settingsTabAccounts", "settingsTabContent", "settingsTabAmounts", "settingsTabTemplates", "settingsTabMau"];
+function hasGhTokenSaved() {
+  return !!getToken();
+}
+function applySettingsLock() {
+  const locked = !hasGhTokenSaved();
+  SETTINGS_GATED_PANEL_IDS.forEach((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    let hint = panel.querySelector(".settings-lock-hint");
+    if (!hint) {
+      hint = document.createElement("p");
+      hint.className = "settings-lock-hint";
+      hint.innerHTML = "🔒 Nhập <strong>Personal Access Token GitHub</strong> ở tab <strong>GitHub</strong> rồi bấm \"Lưu thông tin kết nối\" để xem và chỉnh sửa dữ liệu này.";
+      panel.prepend(hint);
+    }
+    hint.hidden = !locked;
+    panel.querySelectorAll(".panel-head, .table-wrap").forEach((el) => {
+      el.style.display = locked ? "none" : "";
+    });
+  });
 }
 function closeSettingsModal() {
   $("#settingsBackdrop").hidden = true;
@@ -2002,13 +2241,16 @@ async function init() {
   await loadPresetsInitial();
   await loadTemplatesInitial();
   await loadContentInitial();
+  await loadAmountsInitial();
 
   renderTable();
   populateQrTemplateOptions();
   populateQrAccounts();
   renderMauList();
   renderContentSuggestions();
+  renderQuickAmountsChips();
   renderVietqrBanksTable();
+  applySettingsLock();
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
@@ -2062,6 +2304,7 @@ async function init() {
     localStorage.removeItem(LS_GH_TOKEN);
     $("#ghToken").value = "";
     updateGhStatusLabel();
+    applySettingsLock();
     setStatus($("#ghMsg"), "Đã xoá token khỏi trình duyệt.", "ok");
     setStatus($("#ghCheckMsg"), "");
   });
@@ -2093,6 +2336,11 @@ async function init() {
     saveTemplatesCache();
     await saveTemplatesToGithub();
   });
+  $("#btnAddAmountRow").addEventListener("click", addAmountRow);
+  $("#btnSaveAmountsGithub").addEventListener("click", async () => {
+    saveAmountsCache();
+    await saveAmountsToGithub();
+  });
   $("#btnSavePreset").addEventListener("click", saveCurrentFormAsPreset);
   $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
   $("#btnClearForm").addEventListener("click", clearEnteredInfo);
@@ -2111,14 +2359,6 @@ async function init() {
   $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
   $("#btnClearActivePreset").addEventListener("click", clearActivePreset);
 
-  $$("#quickAmounts .chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
-      $("#qrAmount").value = formatNumber(chip.dataset.val);
-      onGenerateQr(null, { silent: true });
-    });
-  });
   $("#qrAmount").addEventListener("input", () => {
     $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
   });
@@ -2128,6 +2368,16 @@ async function init() {
     "input",
     debounce(() => renderTable(), 200)
   );
+
+  // Đồng bộ "title" (tooltip khi rê chuột) = giá trị đầy đủ cho mọi ô nhập
+  // trong các bảng quản lý — nội dung dài bị cắt/khuất trong ô nhỏ vẫn xem
+  // được đầy đủ bằng cách rê chuột vào, không cần mở rộng bảng.
+  document.addEventListener("input", (e) => {
+    const el = e.target;
+    if (el.tagName === "INPUT" && el.type !== "password" && el.closest(".table-wrap")) {
+      el.title = el.value;
+    }
+  });
 
   $("#qrForm").addEventListener("submit", (e) => onGenerateQr(e));
   $("#qrAmount").addEventListener("input", (e) => {

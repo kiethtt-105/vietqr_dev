@@ -65,6 +65,7 @@
       <nav class="tabs settings-tabs">
         <button class="tab active" type="button" data-settings-tab="accounts">Tài khoản</button>
         <button class="tab" type="button" data-settings-tab="content">Nội dung</button>
+        <button class="tab" type="button" data-settings-tab="amounts">Số tiền gợi ý</button>
         <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
         <button class="tab" type="button" data-settings-tab="mau">Mẫu chuyển tiền</button>
         <button class="tab" type="button" data-settings-tab="vietqr">VietQR</button>
@@ -121,6 +122,30 @@
               </tr>
             </thead>
             <tbody id="contentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="settings-tab-panel" id="settingsTabAmounts" hidden>
+        <div class="panel-head panel-head--accounts">
+          <div class="panel-head-top">
+            <span class="count-badge" id="amountsCount">0 dòng</span>
+          </div>
+          <div class="panel-head-actions">
+            <button class="btn subtle" id="btnAddAmountRow" type="button">+ Thêm dòng</button>
+            <button class="btn primary" id="btnSaveAmountsGithub" type="button">Lưu lên GitHub</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="amountsTable">
+            <thead>
+              <tr>
+                <th style="width:38px">STT</th>
+                <th>Số tiền gợi ý (đ)</th>
+                <th style="width:56px"></th>
+              </tr>
+            </thead>
+            <tbody id="amountsTableBody"></tbody>
           </table>
         </div>
       </div>
@@ -251,6 +276,10 @@
             <span>File mẫu hiển thị QR</span>
             <input id="ghPathTemplates" type="text" value="data/templates.json">
           </label>
+          <label>
+            <span>File số tiền gợi ý</span>
+            <input id="ghPathAmounts" type="text" value="data/so-tien-goi-y.json">
+          </label>
         </div>
 
         <div class="gh-actions">
@@ -319,14 +348,7 @@
             </label>
             <p class="field-warning" id="qrAmountWarning" hidden></p>
             <div class="quick-amounts suggest-amounts" id="suggestAmounts" hidden></div>
-            <div class="quick-amounts" id="quickAmounts">
-              <button type="button" class="chip" data-val="20000">20K</button>
-              <button type="button" class="chip" data-val="50000">50K</button>
-              <button type="button" class="chip" data-val="100000">100K</button>
-              <button type="button" class="chip" data-val="200000">200K</button>
-              <button type="button" class="chip" data-val="500000">500K</button>
-              <button type="button" class="chip" data-val="1000000">1Tr</button>
-            </div>
+            <div class="quick-amounts" id="quickAmounts"></div>
 
             <label class="field">
               <span>Nội dung chuyển khoản</span>
@@ -337,6 +359,7 @@
               </div>
             </label>
             <p class="field-counter" id="qrContentCounter">0/25</p>
+            <div class="qr-content-preview" id="qrContentPreview" hidden></div>
           </section>
 
           <div class="qr-form-actions">
