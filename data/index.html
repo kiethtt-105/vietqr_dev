@@ -26,7 +26,7 @@
 
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">QR</span>
+      <span class="brand-mark"><img src="main.png" alt="Logo"></span>
       <div class="brand-text">
         <h1>QR Generator</h1>
         <p class="brand-sub">Tạo mã QR chuyển khoản VietQR</p>
@@ -63,10 +63,12 @@
       </div>
 
       <nav class="tabs settings-tabs">
-        <button class="tab active" type="button" data-settings-tab="accounts">Danh sách tài khoản</button>
-        <button class="tab" type="button" data-settings-tab="content">Nội dung chuyển khoản</button>
+        <button class="tab active" type="button" data-settings-tab="accounts">Tài khoản</button>
+        <button class="tab" type="button" data-settings-tab="content">Nội dung</button>
         <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
-        <button class="tab" type="button" data-settings-tab="github">Kết nối GitHub</button>
+        <button class="tab" type="button" data-settings-tab="mau">Mẫu chuyển tiền</button>
+        <button class="tab" type="button" data-settings-tab="vietqr">VietQR</button>
+        <button class="tab" type="button" data-settings-tab="github">GitHub</button>
       </nav>
 
       <div class="settings-tabs-viewport" id="settingsTabsViewport">
@@ -148,6 +150,61 @@
         </div>
       </div>
 
+      <div class="settings-tab-panel" id="settingsTabMau" hidden>
+        <div class="panel-head panel-head--accounts">
+          <div class="panel-head-top">
+            <span class="count-badge" id="mauSettingsCount">0 mẫu</span>
+          </div>
+          <div class="panel-head-actions">
+            <button class="btn subtle" id="btnAddMauRow" type="button">+ Thêm dòng</button>
+            <button class="btn primary js-save-mau-btn" id="btnSaveMauSettingsGithub" type="button">Lưu lên GitHub</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="mauTable">
+            <thead>
+              <tr>
+                <th style="width:38px">STT</th>
+                <th>Tên mẫu</th>
+                <th>Tài khoản</th>
+                <th>Số TK</th>
+                <th style="width:100px">Số tiền</th>
+                <th>Nội dung</th>
+                <th style="width:110px">Mẫu hiển thị</th>
+                <th style="width:56px"></th>
+              </tr>
+            </thead>
+            <tbody id="mauTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="settings-tab-panel" id="settingsTabVietqrBanks" hidden>
+        <div class="panel-head panel-head--accounts">
+          <div class="panel-head-top">
+            <span class="count-badge" id="vietqrBanksCount">0 ngân hàng</span>
+            <input class="search-input" id="vietqrBankSearch" type="text" placeholder="🔎 Tìm ngân hàng…">
+          </div>
+          <div class="panel-head-actions">
+            <button class="icon-btn" id="btnRefreshBanksVietqrTab" type="button" title="Làm mới từ VietQR" aria-label="Làm mới ngân hàng">⟳</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="vietqrBanksTable">
+            <thead>
+              <tr>
+                <th style="width:38px">STT</th>
+                <th style="width:40px"></th>
+                <th>Tên ngân hàng</th>
+                <th style="width:90px">Mã</th>
+                <th style="width:110px">BIN</th>
+              </tr>
+            </thead>
+            <tbody id="vietqrBanksTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="settings-tab-panel" id="settingsTabGithub" hidden>
         <div class="gh-grid">
           <label>
@@ -168,7 +225,7 @@
               <button class="btn subtle" id="btnGhCheck" type="button">Kiểm tra kết nối</button>
               <span class="status inline" id="ghCheckMsg"></span>
             </div>
-            <p class="hint">⚠ Token lưu dạng plaintext trong trình duyệt này. Dùng fine-grained token, chỉ cấp quyền Contents: Read and write cho 1 repo, và xoá khi dùng xong trên máy lạ.</p>
+            <p class="hint">⚠ Token lưu dạng plaintext trên trình duyệt. Dùng fine-grained token, chỉ cấp quyền cho 1 repo.</p>
           </label>
         </div>
 
@@ -222,8 +279,8 @@
         <span class="count-badge" id="mauCount">0 mẫu</span>
       </div>
       <div class="mau-list" id="mauList"></div>
-      <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — sang tab "Tạo giao dịch", điền form rồi bấm "💾 Lưu mẫu mới".</p>
-      <button class="btn subtle full" id="btnSaveMauGithub" type="button">Lưu mẫu lên GitHub</button>
+      <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — điền form ở tab "Tạo giao dịch" rồi lưu.</p>
+      <button class="btn subtle full js-save-mau-btn" id="btnSaveMauGithub" type="button">Lưu mẫu lên GitHub</button>
     </section>
 
     <section class="panel" id="tab-qr">
@@ -309,7 +366,7 @@
               <rect x="3" y="14" width="7" height="7" rx="1"></rect>
               <path d="M14 14h3v3h-3zM14 20h7M20 14v3M17.5 20v1M20 20v0.01"></path>
             </svg>
-            <p>Điền thông tin bên trái và bấm <strong>Tạo mã QR</strong> để xem trước.</p>
+            <p>Điền thông tin rồi bấm <strong>Tạo mã QR</strong>.</p>
           </div>
           <div class="qr-actions" id="qrActions" hidden>
             <button class="btn subtle" id="btnCopyLink" type="button">Sao chép link ảnh</button>
