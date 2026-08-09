@@ -515,9 +515,11 @@ async function savePresetsToGithub() {
     showToast(`Mẫu ở dòng ${emptyRows.join(", ")} chưa có tên — điền hoặc xoá trước khi lưu.`, "err");
     return;
   }
-  const btn = $("#btnSaveMauGithub");
-  btn.classList.add("is-loading");
-  btn.disabled = true;
+  const btns = $$(".js-save-mau-btn");
+  btns.forEach((b) => {
+    b.classList.add("is-loading");
+    b.disabled = true;
+  });
   setStatus($("#ghMsg"), "Đang lưu mẫu chuyển tiền lên GitHub…");
   try {
     state.sha.presets = await ghWriteJson(
@@ -534,8 +536,10 @@ async function savePresetsToGithub() {
     showToast("Lỗi khi lưu lên GitHub", "err");
     openSettingsModal("github");
   } finally {
-    btn.classList.remove("is-loading");
-    btn.disabled = false;
+    btns.forEach((b) => {
+      b.classList.remove("is-loading");
+      b.disabled = false;
+    });
   }
 }
 
@@ -703,6 +707,7 @@ async function refreshRefBanksFromVietQR() {
     state.refBanks = banks;
     writeRefBanksCache(banks);
     renderTable();
+    renderVietqrBanksTable();
     btn.classList.remove("is-loading");
     btn.textContent = `Đã cập nhật ${state.refBanks.length} ngân hàng ✓`;
   } catch (err) {
@@ -1239,6 +1244,85 @@ function renderMauList() {
       deleteMauPreset(Number(btn.dataset.del));
     });
   });
+  renderMauTable();
+}
+
+// ---------- Cài đặt: Mẫu chuyển tiền (bảng sửa trực tiếp) ----------
+function renderMauTable() {
+  const body = $("#mauTableBody");
+  if (!body) return;
+  body.innerHTML = "";
+  state.presets.forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
+      <td data-label="Tên mẫu"><input data-mau-idx="${idx}" data-mau-field="name" value="${escapeAttr(p.name || "")}"></td>
+      <td data-label="Tài khoản"><input data-mau-idx="${idx}" data-mau-field="accountName" value="${escapeAttr(p.accountName || "")}"></td>
+      <td data-label="Số TK"><input data-mau-idx="${idx}" data-mau-field="accountNum" value="${escapeAttr(p.accountNum || "")}"></td>
+      <td data-label="Số tiền"><input data-mau-idx="${idx}" data-mau-field="amount" inputmode="numeric" value="${escapeAttr(p.amount || "")}"></td>
+      <td data-label="Nội dung"><input data-mau-idx="${idx}" data-mau-field="content" value="${escapeAttr(p.content || "")}"></td>
+      <td data-label="Mẫu hiển thị"><input data-mau-idx="${idx}" data-mau-field="template" value="${escapeAttr(p.template || "")}"></td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Xoá dòng" data-mau-tbl-del="${idx}">✕</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+  const countEl = $("#mauSettingsCount");
+  if (countEl) countEl.textContent = `${state.presets.length} mẫu`;
+
+  body.querySelectorAll("input[data-mau-field]").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const idx = Number(e.target.dataset.mauIdx);
+      const field = e.target.dataset.mauField;
+      const preset = state.presets[idx];
+      if (!preset) return;
+      preset[field] = field === "amount" ? Number(rawNumber(e.target.value)) || 0 : e.target.value;
+      savePresetsCache();
+      if (field !== "amount") return;
+    });
+  });
+  body.querySelectorAll("[data-mau-tbl-del]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.target.dataset.mauTblDel);
+      deleteMauPreset(idx);
+    });
+  });
+}
+function renderVietqrBanksTable(filter) {
+  const body = $("#vietqrBanksTableBody");
+  if (!body) return;
+  const q = (filter || $("#vietqrBankSearch")?.value || "").trim().toLowerCase();
+  const list = !q
+    ? state.refBanks
+    : state.refBanks.filter((b) =>
+        `${b.shortName || ""} ${b.name || ""} ${b.code || ""} ${b.bin || ""}`.toLowerCase().includes(q)
+      );
+  body.innerHTML = "";
+  list.forEach((b, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="stt-cell">${idx + 1}</td>
+      <td>${b.logo ? `<img src="${escapeAttr(b.logo)}" alt="" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">` : ""}</td>
+      <td data-label="Tên ngân hàng">${escapeHtml(b.shortName || b.name || "")}</td>
+      <td data-label="Mã">${escapeHtml(b.code || "")}</td>
+      <td data-label="BIN">${escapeHtml(b.bin || "")}</td>`;
+    body.appendChild(tr);
+  });
+  const countEl = $("#vietqrBanksCount");
+  if (countEl) countEl.textContent = `${state.refBanks.length} ngân hàng`;
+}
+async function refreshVietqrBanksTab() {
+  await refreshRefBanksFromVietQR();
+  renderVietqrBanksTable();
+}
+
+function addMauRow() {
+  state.presets.push({ name: "", accountName: "", accountNum: "", amount: 0, content: "", template: "" });
+  savePresetsCache();
+  renderMauList();
+  const inputs = $("#mauTableBody").querySelectorAll("input[data-mau-field='name']");
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
 }
 function updateMauActiveUi() {
   const tag = $("#mauActiveTag");
@@ -1707,10 +1791,14 @@ function switchSettingsTab(tabName) {
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
   $("#settingsTabContent").hidden = tabName !== "content";
   $("#settingsTabTemplates").hidden = tabName !== "templates";
+  $("#settingsTabMau").hidden = tabName !== "mau";
+  $("#settingsTabVietqrBanks").hidden = tabName !== "vietqr";
   $("#settingsTabGithub").hidden = tabName !== "github";
   if (tabName === "accounts") renderTable();
   if (tabName === "content") renderContentTable();
   if (tabName === "templates") renderTemplatesTable();
+  if (tabName === "mau") renderMauTable();
+  if (tabName === "vietqr") renderVietqrBanksTable();
 
   if (viewport) {
     const activePanel = viewport.querySelector(".settings-tab-panel:not([hidden])");
@@ -1756,7 +1844,7 @@ function initTheme() {
 
 function initRippleEffect() {
   document.addEventListener("click", (e) => {
-    const target = e.target.closest(".btn, .icon-btn");
+    const target = e.target.closest(".btn, .icon-btn, .chip, .tab, .mau-card-body");
     if (!target) return;
     const rect = target.getBoundingClientRect();
     const size = Math.max(rect.width, rect.height) * 1.5;
@@ -1806,6 +1894,7 @@ async function init() {
   populateQrAccounts();
   renderMauList();
   renderContentSuggestions();
+  renderVietqrBanksTable();
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
@@ -1873,6 +1962,13 @@ async function init() {
     savePresetsCache();
     await savePresetsToGithub();
   });
+  $("#btnAddMauRow").addEventListener("click", addMauRow);
+  $("#btnSaveMauSettingsGithub").addEventListener("click", async () => {
+    savePresetsCache();
+    await savePresetsToGithub();
+  });
+  $("#btnRefreshBanksVietqrTab").addEventListener("click", refreshVietqrBanksTab);
+  $("#vietqrBankSearch").addEventListener("input", (e) => renderVietqrBanksTable(e.target.value));
   $("#btnAddContentRow").addEventListener("click", addContentRow);
   $("#btnSaveContentGithub").addEventListener("click", async () => {
     saveContentCache();
