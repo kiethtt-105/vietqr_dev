@@ -1,10 +1,11 @@
 [
   {
     "name": "CONG TY TNHH GRAB VIET NAM",
-    "accountName": "GRAB",
+    "accountName": "CONG TY TNHH GRAB",
     "amount": 500000,
     "content": "9246061 HUYNH TRAN TUAN KIET",
-    "template": "print"
+    "template": "print",
+    "accountNum": "150010000111"
   },
   {
     "name": "VIETLOT SMS",
