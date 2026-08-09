@@ -1,0 +1,27 @@
+{
+  "name": "vietqr-dev",
+  "version": "1.0.0",
+  "description": "QR Generator - Tạo mã QR chuyển khoản VietQR",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kiethtt-105/vietqr_dev.git"
+  },
+  "keywords": [
+    "vietqr",
+    "qr-code",
+    "payment"
+  ],
+  "author": "tuankiet",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kiethtt-105/vietqr_dev/issues"
+  },
+  "homepage": "https://github.com/kiethtt-105/vietqr_dev#readme",
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
