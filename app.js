@@ -560,6 +560,14 @@ async function savePresetsToGithub() {
     openSettingsModal("mau");
     return;
   }
+  const unresolvedTemplateRows = state.presets
+    .map((p, i) => (p.template && !state.templates.some((t) => t.value === p.template) ? i + 1 : null))
+    .filter((n) => n != null);
+  if (unresolvedTemplateRows.length) {
+    showToast(`Mẫu ở dòng ${unresolvedTemplateRows.join(", ")} chưa chọn đúng mẫu hiển thị — mở tab "Mẫu chuyển tiền" để chọn lại.`, "err");
+    openSettingsModal("mau");
+    return;
+  }
   const btns = $$(".js-save-mau-btn");
   btns.forEach((b) => {
     b.classList.add("is-loading");
@@ -1313,6 +1321,14 @@ function mauAccountOptionsHtml(selectedIdx) {
     .join("");
   return html;
 }
+function mauTemplateOptionsHtml(selectedValue) {
+  const known = state.templates.some((t) => t.value === selectedValue);
+  let html = !selectedValue || !known ? `<option value="" ${!selectedValue ? "selected" : ""}>— Chọn mẫu hiển thị —</option>` : "";
+  html += state.templates
+    .map((t) => `<option value="${escapeAttr(t.value)}" ${t.value === selectedValue ? "selected" : ""}>${escapeHtml(t.label)}</option>`)
+    .join("");
+  return html;
+}
 function renderMauTable() {
   const body = $("#mauTableBody");
   if (!body) return;
@@ -1324,6 +1340,7 @@ function renderMauTable() {
     const acc = findAccountForPreset(p);
     const accIdx = acc ? state.accounts.indexOf(acc) : -1;
     const unresolved = !acc && (p.accountName || p.accountNum);
+    const tplUnresolved = p.template && !state.templates.some((t) => t.value === p.template);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
@@ -1333,10 +1350,13 @@ function renderMauTable() {
           ${mauAccountOptionsHtml(accIdx)}
         </select>
       </td>
-      <td data-label="Số TK"><input data-mau-field="accountNumDisplay" value="${escapeAttr(p.accountNum || "")}" disabled></td>
       <td data-label="Số tiền"><input data-mau-idx="${idx}" data-mau-field="amount" inputmode="numeric" value="${escapeAttr(p.amount || "")}"></td>
       <td data-label="Nội dung"><input data-mau-idx="${idx}" data-mau-field="content" value="${escapeAttr(p.content || "")}"></td>
-      <td data-label="Mẫu hiển thị"><input data-mau-idx="${idx}" data-mau-field="template" value="${escapeAttr(p.template || "")}"></td>
+      <td data-label="Mẫu hiển thị">
+        <select data-mau-idx="${idx}" data-mau-field="templateSelect" class="${tplUnresolved ? "input-err" : ""}" title="${tplUnresolved ? "Mẫu hiển thị này không còn tồn tại — chọn lại" : ""}">
+          ${mauTemplateOptionsHtml(p.template)}
+        </select>
+      </td>
       <td class="row-actions">
         <button class="icon-btn" title="Xoá dòng" data-mau-tbl-del="${idx}">✕</button>
       </td>`;
@@ -1365,6 +1385,17 @@ function renderMauTable() {
       const acc = val === "" ? null : state.accounts[Number(val)];
       preset.accountName = acc ? acc.list_name : "";
       preset.accountNum = acc ? acc.data_num : "";
+      savePresetsCache();
+      markDirty("presets");
+      renderMauTable();
+    });
+  });
+  body.querySelectorAll("select[data-mau-field='templateSelect']").forEach((sel) => {
+    sel.addEventListener("change", (e) => {
+      const idx = Number(e.target.dataset.mauIdx);
+      const preset = state.presets[idx];
+      if (!preset) return;
+      preset.template = e.target.value;
       savePresetsCache();
       markDirty("presets");
       renderMauTable();
