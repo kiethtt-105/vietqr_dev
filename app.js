@@ -1168,6 +1168,7 @@ function renderTable() {
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-move="${idx}" data-dir="-1" ${!sortable || idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-move="${idx}" data-dir="1" ${!sortable || idx === state.accounts.length - 1 ? "disabled" : ""}>▼</button>
+        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-confirm-row="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -1203,29 +1204,22 @@ function renderTable() {
       moveAccountRow(idx, dir);
     });
   });
+  body.querySelectorAll("[data-confirm-row]").forEach((btn) => {
+    btn.addEventListener("click", () => saveAccountsToGithub());
+  });
   body.querySelectorAll("[data-del]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const idx = Number(e.target.dataset.del);
       const removedAcc = state.accounts[idx];
-      const name = removedAcc.list_name;
+      const name = removedAcc.list_name || `dòng ${idx + 1}`;
+      const ok = await showConfirm(`Xoá tài khoản "${name}"?`, "Xoá");
+      if (!ok) return;
       state.accounts.splice(idx, 1);
       renumberAccountsStt();
       markDirty("accounts");
       renderTable();
       populateQrAccounts();
-      showToast(`Đã xoá "${name}"`, "ok", {
-        duration: 5000,
-        actionLabel: "Hoàn tác",
-        onAction: () => {
-          const restoreAt = Math.min(idx, state.accounts.length);
-          state.accounts.splice(restoreAt, 0, removedAcc);
-          renumberAccountsStt();
-          markDirty("accounts");
-          renderTable();
-          populateQrAccounts();
-          showToast(`Đã khôi phục "${name}"`, "ok");
-        },
-      });
+      showToast(`Đã xoá "${name}"`, "ok");
     });
   });
 }
@@ -1512,6 +1506,7 @@ function renderMauTable() {
         </select>
       </td>
       <td class="row-actions">
+        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-mau-tbl-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-mau-tbl-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -1554,6 +1549,9 @@ function renderMauTable() {
       markDirty("presets");
       renderMauTable();
     });
+  });
+  body.querySelectorAll("[data-mau-tbl-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => savePresetsToGithub());
   });
   body.querySelectorAll("[data-mau-tbl-del]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1657,28 +1655,20 @@ function selectMau(idx) {
 function deleteMauPreset(idx) {
   const removed = state.presets[idx];
   const name = removed.name || `Mẫu ${idx + 1}`;
-  state.presets.splice(idx, 1);
-  if (state.selectedPresetIdx === idx) {
-    state.selectedPresetIdx = null;
-  } else if (state.selectedPresetIdx != null && state.selectedPresetIdx > idx) {
-    state.selectedPresetIdx -= 1;
-  }
-  savePresetsCache();
-  markDirty("presets");
-  renderMauList();
-  updateMauActiveUi();
-  saveFormState();
-  showToast(`Đã xoá "${name}"`, "ok", {
-    duration: 5000,
-    actionLabel: "Hoàn tác",
-    onAction: () => {
-      const restoreAt = Math.min(idx, state.presets.length);
-      state.presets.splice(restoreAt, 0, removed);
-      savePresetsCache();
-      markDirty("presets");
-      renderMauList();
-      showToast(`Đã khôi phục "${name}"`, "ok");
-    },
+  showConfirm(`Xoá mẫu "${name}"?`, "Xoá").then((ok) => {
+    if (!ok) return;
+    state.presets.splice(idx, 1);
+    if (state.selectedPresetIdx === idx) {
+      state.selectedPresetIdx = null;
+    } else if (state.selectedPresetIdx != null && state.selectedPresetIdx > idx) {
+      state.selectedPresetIdx -= 1;
+    }
+    savePresetsCache();
+    markDirty("presets");
+    renderMauList();
+    updateMauActiveUi();
+    saveFormState();
+    showToast(`Đã xoá "${name}"`, "ok");
   });
 }
 
@@ -1962,6 +1952,7 @@ function renderContentTable() {
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Nội dung gợi ý"><input data-content-idx="${idx}" value="${escapeAttr(text)}" title="${escapeAttr(text)}"></td>
       <td class="row-actions">
+        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-content-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-content-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -1978,28 +1969,21 @@ function renderContentTable() {
       renderContentSuggestions();
     });
   });
+  body.querySelectorAll("[data-content-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => saveContentToGithub());
+  });
   body.querySelectorAll("[data-content-del]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const idx = Number(e.target.dataset.contentDel);
       const removed = state.content[idx];
+      const ok = await showConfirm(`Xoá nội dung "${removed}"?`, "Xoá");
+      if (!ok) return;
       state.content.splice(idx, 1);
       saveContentCache();
       markDirty("content");
       renderContentTable();
       renderContentSuggestions();
-      showToast(`Đã xoá "${removed}"`, "ok", {
-        duration: 5000,
-        actionLabel: "Hoàn tác",
-        onAction: () => {
-          const restoreAt = Math.min(idx, state.content.length);
-          state.content.splice(restoreAt, 0, removed);
-          saveContentCache();
-          markDirty("content");
-          renderContentTable();
-          renderContentSuggestions();
-          showToast(`Đã khôi phục "${removed}"`, "ok");
-        },
-      });
+      showToast(`Đã xoá "${removed}"`, "ok");
     });
   });
 }
@@ -2024,6 +2008,7 @@ function renderAmountsTable() {
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Số tiền gợi ý (đ)"><input data-amount-idx="${idx}" inputmode="numeric" value="${escapeAttr(formatNumber(amount))}" title="${escapeAttr(formatNumber(amount))}"></td>
       <td class="row-actions">
+        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-amount-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-amount-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -2042,28 +2027,21 @@ function renderAmountsTable() {
       renderQuickAmountsChips();
     });
   });
+  body.querySelectorAll("[data-amount-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => saveAmountsToGithub());
+  });
   body.querySelectorAll("[data-amount-del]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const idx = Number(e.target.dataset.amountDel);
       const removed = state.amounts[idx];
+      const ok = await showConfirm(`Xoá số tiền gợi ý ${formatNumber(removed)}đ?`, "Xoá");
+      if (!ok) return;
       state.amounts.splice(idx, 1);
       saveAmountsCache();
       markDirty("amounts");
       renderAmountsTable();
       renderQuickAmountsChips();
-      showToast(`Đã xoá ${formatNumber(removed)}đ`, "ok", {
-        duration: 5000,
-        actionLabel: "Hoàn tác",
-        onAction: () => {
-          const restoreAt = Math.min(idx, state.amounts.length);
-          state.amounts.splice(restoreAt, 0, removed);
-          saveAmountsCache();
-          markDirty("amounts");
-          renderAmountsTable();
-          renderQuickAmountsChips();
-          showToast(`Đã khôi phục ${formatNumber(removed)}đ`, "ok");
-        },
-      });
+      showToast(`Đã xoá ${formatNumber(removed)}đ`, "ok");
     });
   });
 }
@@ -2156,6 +2134,7 @@ function renderTemplatesTable() {
       <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}" title="${escapeAttr(t.value)}"></td>
       <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"></td>
       <td class="row-actions">
+        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-tpl-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -2173,28 +2152,21 @@ function renderTemplatesTable() {
       populateQrTemplateOptions();
     });
   });
+  body.querySelectorAll("[data-tpl-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => saveTemplatesToGithub());
+  });
   body.querySelectorAll("[data-tpl-del]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const idx = Number(e.target.dataset.tplDel);
       const removed = state.templates[idx];
+      const ok = await showConfirm(`Xoá mẫu hiển thị "${removed.label || removed.value}"?`, "Xoá");
+      if (!ok) return;
       state.templates.splice(idx, 1);
       saveTemplatesCache();
       markDirty("templates");
       renderTemplatesTable();
       populateQrTemplateOptions();
-      showToast(`Đã xoá "${removed.label || removed.value}"`, "ok", {
-        duration: 5000,
-        actionLabel: "Hoàn tác",
-        onAction: () => {
-          const restoreAt = Math.min(idx, state.templates.length);
-          state.templates.splice(restoreAt, 0, removed);
-          saveTemplatesCache();
-          markDirty("templates");
-          renderTemplatesTable();
-          populateQrTemplateOptions();
-          showToast(`Đã khôi phục "${removed.label || removed.value}"`, "ok");
-        },
-      });
+      showToast(`Đã xoá "${removed.label || removed.value}"`, "ok");
     });
   });
 }

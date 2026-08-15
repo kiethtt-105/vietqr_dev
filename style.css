@@ -354,6 +354,7 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,105
 .combo-toggle,.eye-btn{z-index:2;}
 .panel-head-actions{flex-wrap:wrap;row-gap:8px;}
 .icon-btn:hover{border-color:var(--danger);color:var(--danger);transform:translateY(-1px);}
+.row-confirm-btn:hover{border-color:var(--accent);color:var(--accent-bright);}
 .icon-btn:active{transform:scale(.92);}
 .icon-btn.order-btn{font-size:10px;color:var(--ink-faint);}
 .icon-btn.order-btn:hover{border-color:var(--accent);color:var(--accent-bright);}
