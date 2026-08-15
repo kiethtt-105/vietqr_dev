@@ -10,8 +10,16 @@
   {
     "name": "VIETLOT SMS",
     "accountName": "Viettel Money",
-    "amount": 500000,
+    "amount": 20000,
     "content": "Tuan Kiet Chuyen Tien",
+    "template": "print"
+  },
+  {
+    "name": "I26521 055 TUANKIET_ XV3",
+    "accountName": "iPA",
+    "accountNum": "MS00T09548691713297",
+    "amount": 4510203,
+    "content": "I26521 055 TUANKIET_ XV3",
     "template": "print"
   }
 ]
