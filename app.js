@@ -2490,6 +2490,37 @@ async function init() {
     setTimeout(() => (e.target.textContent = "Sao chép link ảnh"), 1500);
   });
 
+  // Ảnh QR nằm ở domain khác (img.vietqr.io) — thuộc tính "download" trên thẻ <a>
+  // bị trình duyệt BỎ QUA với link cross-origin, nên bấm nút chỉ mở/điều hướng
+  // tới ảnh chứ không lưu file. Tự fetch ảnh về dạng blob rồi tải qua blob URL
+  // (cùng-origin) để nút "Tải ảnh QR" hoạt động đúng như tên gọi.
+  $("#btnDownload").addEventListener("click", async (e) => {
+    const url = e.currentTarget.href;
+    if (!url) return;
+    e.preventDefault();
+    const btn = e.currentTarget;
+    const oldLabel = btn.textContent;
+    btn.textContent = "Đang tải…";
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "qr-thanh-toan.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    } catch (err) {
+      console.error(err);
+      showToast("Không tải được ảnh QR về máy — thử \"Mở link ảnh\" rồi lưu thủ công.", "err");
+    } finally {
+      btn.textContent = oldLabel;
+    }
+  });
+
   updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
   restoreFormState();
