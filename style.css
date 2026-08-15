@@ -381,6 +381,51 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,105
 .bank-picker-item:hover .bank-picker-code,.bank-picker-item.active .bank-picker-code{color:var(--accent-bright);}
 .bank-picker-empty{padding:14px 10px;font-size:12px;color:var(--ink-faint);text-align:center;}
 
+/* Dropdown chọn (Tài khoản nhận / QR Templates...) dạng tuỳ biến — thay cho
+   <select> gốc của trình duyệt (vốn không theo được theme sáng/tối của app,
+   viền/khoảng cách/hover đều mặc định của hệ điều hành, nhìn lệch tông so
+   với phần còn lại của giao diện). Select gốc vẫn giữ trong DOM (ẩn đi) để
+   toàn bộ logic đọc/ghi .value không cần sửa. */
+.custom-select{position:relative;}
+.custom-select-native{
+  position:absolute;inset:0;width:100%;height:100%;
+  opacity:0;pointer-events:none;
+}
+.custom-select-trigger{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-family:var(--body);font-size:12.5px;text-align:left;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:8px 10px;color:var(--ink);
+  cursor:pointer;transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.custom-select-trigger:hover{border-color:var(--border-strong);}
+.custom-select-trigger.open,.custom-select-trigger:focus-visible{
+  border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash);outline:none;
+}
+.custom-select-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.custom-select-trigger .chev{
+  flex:none;font-size:10px;color:var(--ink-faint);
+  transition:transform .18s ease;
+}
+.custom-select-trigger.open .chev{transform:rotate(180deg);color:var(--accent-bright);}
+.custom-select-panel{
+  position:fixed;z-index:70;max-height:260px;overflow-y:auto;
+  background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);padding:4px;
+  box-shadow:0 12px 32px rgba(0,0,0,.45);
+  animation:selectPanelIn .12s ease;
+}
+@keyframes selectPanelIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+.custom-select-item{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  width:100%;text-align:left;background:transparent;border:none;
+  color:var(--ink);font-family:var(--body);font-size:12.5px;
+  padding:8px 9px;border-radius:5px;cursor:pointer;
+}
+.custom-select-item:hover{background:var(--accent-wash);color:var(--accent-bright);}
+.custom-select-item.active{background:var(--accent-wash);color:var(--accent-bright);font-weight:600;}
+.custom-select-item.active::after{content:"✓";font-size:11px;flex:none;}
+
 .workspace-tabs{margin-bottom:16px;}
 .workspace{display:block;}
 .mau-panel{background:var(--bg);max-width:640px;margin:0 auto;}

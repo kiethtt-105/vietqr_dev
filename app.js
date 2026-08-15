@@ -885,6 +885,101 @@ function openBankPicker(idx, inputEl) {
   renderBankPickerList(idx, "");
 }
 
+// ---------- Dropdown chọn tuỳ biến (thay <select> gốc cho đẹp & đồng bộ theme) ----------
+let customSelectOpenEl = null;
+function closeCustomSelect() {
+  const panel = $("#customSelectPanel");
+  if (panel) panel.hidden = true;
+  if (customSelectOpenEl && customSelectOpenEl._csTrigger) {
+    customSelectOpenEl._csTrigger.classList.remove("open");
+  }
+  customSelectOpenEl = null;
+}
+function positionCustomSelectPanel(triggerEl) {
+  const panel = $("#customSelectPanel");
+  const rect = triggerEl.getBoundingClientRect();
+  const maxHeight = 260;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const openUp = spaceBelow < maxHeight && rect.top > spaceBelow;
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8));
+  panel.style.left = `${left}px`;
+  panel.style.width = `${rect.width}px`;
+  if (openUp) {
+    panel.style.top = "";
+    panel.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+  } else {
+    panel.style.bottom = "";
+    panel.style.top = `${rect.bottom + 4}px`;
+  }
+}
+function updateCustomSelectTriggerLabel(selectEl) {
+  if (!selectEl || !selectEl._csTrigger) return;
+  const opt = selectEl.options[selectEl.selectedIndex];
+  selectEl._csTrigger.querySelector(".custom-select-label").textContent = opt ? opt.textContent : "";
+}
+function renderCustomSelectList(selectEl) {
+  const list = $("#customSelectList");
+  if (!list) return;
+  const options = Array.from(selectEl.options);
+  if (!options.length) {
+    list.innerHTML = `<div class="bank-picker-empty">Không có lựa chọn</div>`;
+    return;
+  }
+  list.innerHTML = options
+    .map(
+      (opt, i) =>
+        `<button type="button" class="custom-select-item${i === selectEl.selectedIndex ? " active" : ""}" data-idx="${i}">${escapeHtml(
+          opt.textContent
+        )}</button>`
+    )
+    .join("");
+  list.querySelectorAll("[data-idx]").forEach((btn) => {
+    // mousedown (không phải click) để chạy trước sự kiện blur/outside-click
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const opt = options[Number(btn.dataset.idx)];
+      if (selectEl.value !== opt.value) {
+        selectEl.value = opt.value;
+        selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      updateCustomSelectTriggerLabel(selectEl);
+      closeCustomSelect();
+    });
+  });
+}
+function openCustomSelect(selectEl) {
+  if (customSelectOpenEl === selectEl) {
+    closeCustomSelect();
+    return;
+  }
+  closeCustomSelect();
+  if (!selectEl.options.length) return;
+  customSelectOpenEl = selectEl;
+  selectEl._csTrigger.classList.add("open");
+  const panel = $("#customSelectPanel");
+  panel.hidden = false;
+  positionCustomSelectPanel(selectEl._csTrigger);
+  renderCustomSelectList(selectEl);
+}
+function enhanceSelect(selectEl) {
+  if (!selectEl || selectEl._csEnhanced) return;
+  selectEl._csEnhanced = true;
+  const wrap = document.createElement("div");
+  wrap.className = "custom-select";
+  selectEl.parentNode.insertBefore(wrap, selectEl);
+  wrap.appendChild(selectEl);
+  selectEl.classList.add("custom-select-native");
+  selectEl.tabIndex = -1;
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "custom-select-trigger";
+  trigger.innerHTML = `<span class="custom-select-label"></span><span class="chev">▾</span>`;
+  wrap.appendChild(trigger);
+  selectEl._csTrigger = trigger;
+  trigger.addEventListener("click", () => openCustomSelect(selectEl));
+  updateCustomSelectTriggerLabel(selectEl);
+}
+
 // ---------- Accounts table CRUD ----------
 function loadAccountsCache() {
   const cached = localStorage.getItem(LS_ACCOUNTS_CACHE);
@@ -1320,6 +1415,7 @@ function populateQrTemplateOptions() {
   const prev = sel.value;
   sel.innerHTML = state.templates.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
   if (prev) sel.value = prev;
+  updateCustomSelectTriggerLabel(sel);
 }
 
 // ---------- Mẫu giao dịch (cửa sổ riêng, tách khỏi form Tạo giao dịch) ----------
@@ -1642,6 +1738,7 @@ function populateQrAccounts() {
   } else {
     applyDefaults();
   }
+  updateCustomSelectTriggerLabel(sel);
 }
 function buildQrUrlRaw(bankCode, accNum, amount, content, template, accountName) {
   const base = `https://img.vietqr.io/image/${encodeURIComponent(bankCode)}-${encodeURIComponent(accNum)}-${encodeURIComponent(
@@ -1819,6 +1916,8 @@ function onGenerateQr(e, opts) {
 
   updateContentCounter(content);
   validateAmount(amount);
+  updateCustomSelectTriggerLabel($("#qrAccount"));
+  updateCustomSelectTriggerLabel($("#qrTemplate"));
 
   const url = buildQrUrl(acc, amount, content, template);
 
@@ -1845,6 +1944,7 @@ function onGenerateQr(e, opts) {
   $("#qrEmpty").hidden = true;
   $("#qrActions").hidden = false;
   $("#btnDownload").href = url;
+  $("#btnOpenLink").href = url;
   $("#btnCopyLink").dataset.url = url;
 
   restartAnimation($("#qrCard"));
@@ -2215,7 +2315,7 @@ async function clearEnteredInfo() {
   const ok = await showConfirm("Xoá số tiền, nội dung và mẫu đang chọn trên form", "Xoá");
   if (!ok) return;
   state.selectedPresetIdx = null;
-  clearFormState();v-vvvv
+  clearFormState();
   $("#qrAmount").value = "";
   $("#qrContent").value = "";
   updateContentCounter("");
@@ -2251,6 +2351,8 @@ async function init() {
   renderQuickAmountsChips();
   renderVietqrBanksTable();
   applySettingsLock();
+  enhanceSelect($("#qrAccount"));
+  enhanceSelect($("#qrTemplate"));
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
@@ -2272,6 +2374,10 @@ async function init() {
       closeBankPicker();
       return;
     }
+    if (customSelectOpenEl) {
+      closeCustomSelect();
+      return;
+    }
     if (!$("#settingsBackdrop").hidden) closeSettingsModal();
   });
 
@@ -2280,15 +2386,22 @@ async function init() {
     if (e.target.closest("#bankPickerPopup") || e.target.closest(".bank-input")) return;
     closeBankPicker();
   });
+  document.addEventListener("mousedown", (e) => {
+    if (!customSelectOpenEl) return;
+    if (e.target.closest("#customSelectPanel") || e.target.closest(".custom-select-trigger")) return;
+    closeCustomSelect();
+  });
   window.addEventListener(
     "scroll",
     () => {
       if (bankPickerOpenIdx != null) closeBankPicker();
+      if (customSelectOpenEl) closeCustomSelect();
     },
     true
   );
   window.addEventListener("resize", () => {
     if (bankPickerOpenIdx != null) closeBankPicker();
+    if (customSelectOpenEl) closeCustomSelect();
   });
   $("#btnToggleTokenVisibility").addEventListener("click", () => {
     const input = $("#ghToken");
@@ -2407,11 +2520,15 @@ async function init() {
 
   updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
-  const hadSavedState = restoreFormState();
-  if (!hadSavedState) {
-    applyDefaultPresetIfNeeded();
-    applyDefaultContentIfNeeded();
-  }
+  restoreFormState();
+  // Luôn gọi 2 hàm dưới đây (không chỉ khi chưa có form state đã lưu) vì
+  // bản thân applyDefaultPresetIfNeeded()/applyDefaultContentIfNeeded() đã
+  // tự kiểm tra "đã có preset/nội dung được chọn/nhập chưa" trước khi áp
+  // dụng mặc định — nếu chỉ gọi lúc chưa từng lưu form thì mẫu/nội dung
+  // mặc định do người dùng đặt SAU khi đã dùng app sẽ không bao giờ được
+  // áp dụng lại nữa (vì form state luôn tồn tại sau lần dùng đầu tiên).
+  applyDefaultPresetIfNeeded();
+  applyDefaultContentIfNeeded();
   updateContentCounter($("#qrContent").value.trim());
   updateMauActiveUi();
   switchWorkspaceTab("qr");
