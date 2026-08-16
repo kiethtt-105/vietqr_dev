@@ -39,16 +39,16 @@
     "stt": 3
   },
   {
-    "data__id": 57,
+    "data__id": 21,
     "list_name": "Viettel Money",
     "data_num": "9704229201938102578",
     "name_ac": "Huynh Tran Tuan Kiet",
-    "data__name": "ViettelMoney",
-    "data__code": "VTLMONEY",
-    "data__bin": "971005",
-    "data__shortName": "ViettelMoney",
-    "data__logo": "https://cdn.vietqr.io/img/VIETTELMONEY.png",
-    "data__short_name": "ViettelMoney",
+    "data__name": "MBBank",
+    "data__code": "MB",
+    "data__bin": "970422",
+    "data__shortName": "MBBank",
+    "data__logo": "https://cdn.vietqr.io/img/MB.png",
+    "data__short_name": "MBBank",
     "stt": 4
   },
   {
