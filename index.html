@@ -93,7 +93,7 @@
                 <th>Số tài khoản</th>
                 <th>Chủ tài khoản</th>
                 <th style="width:190px">Ngân hàng</th>
-                <th style="width:96px"></th>
+                <th style="width:186px"></th>
               </tr>
             </thead>
             <tbody id="bankTableBody"></tbody>
@@ -219,8 +219,12 @@
                 <th style="width:38px">STT</th>
                 <th style="width:40px"></th>
                 <th>Tên ngân hàng</th>
+                <th>Tên đầy đủ</th>
                 <th style="width:90px">Mã</th>
                 <th style="width:110px">BIN</th>
+                <th style="width:110px">Swift</th>
+                <th style="width:80px">Chuyển</th>
+                <th style="width:80px">Tra cứu</th>
               </tr>
             </thead>
             <tbody id="vietqrBanksTableBody"></tbody>
@@ -296,6 +300,7 @@
   <nav class="tabs workspace-tabs">
     <button class="tab active" type="button" data-workspace-tab="qr">Tạo giao dịch</button>
     <button class="tab" type="button" data-workspace-tab="mau">Mẫu giao dịch</button>
+    <button class="tab" type="button" data-workspace-tab="adhoc">Thêm Tài Khoản</button>
   </nav>
   <div class="workspace">
 
@@ -362,6 +367,7 @@
           </section>
 
           <div class="qr-form-actions">
+            <button class="btn subtle" type="button" id="btnSaveAsPreset">💾 Lưu mẫu</button>
             <button class="btn subtle" type="button" id="btnUpdatePreset" hidden>✎ Cập nhật mẫu</button>
           </div>
 
@@ -390,6 +396,85 @@
             <button class="btn subtle" id="btnCopyLink" type="button">Sao chép link ảnh</button>
             <a class="btn subtle" id="btnOpenLink" href="#" target="_blank" rel="noopener noreferrer">Mở link ảnh</a>
             <a class="btn primary" id="btnDownload" download="qr-thanh-toan.png">Tải ảnh QR</a>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="panel" id="tab-adhoc" hidden>
+      <div class="qr-layout">
+
+        <form class="qr-form" id="adhocForm">
+
+          <section class="form-section">
+            <h3 class="form-section-title">Tài khoản nhận (không cần lưu sẵn)</h3>
+            <div class="field-row">
+              <label class="field">
+                <span>Ngân hàng</span>
+                <input type="text" class="bank-input" id="adhocBankInput" autocomplete="off" placeholder="🔎 Tìm ngân hàng…">
+              </label>
+              <label class="field">
+                <span>Số tài khoản</span>
+                <input id="adhocAccountNum" type="text" placeholder="VD: 0123456789" autocomplete="off">
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field">
+                <span>Tên chủ tài khoản (tuỳ chọn)</span>
+                <input id="adhocAccountName" type="text" placeholder="VD: NGUYEN VAN A" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>QR Templates</span>
+                <select id="adhocTemplate"></select>
+              </label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h3 class="form-section-title">Số tiền &amp; nội dung</h3>
+            <label class="field">
+              <span>Số tiền (đ)</span>
+              <input id="adhocAmount" type="text" inputmode="numeric" placeholder="0">
+            </label>
+            <div class="quick-amounts" id="adhocQuickAmounts"></div>
+            <label class="field">
+              <span>Nội dung chuyển khoản</span>
+              <input id="adhocContent" type="text" placeholder="" maxlength="90" autocomplete="off">
+            </label>
+          </section>
+
+          <div class="qr-form-actions">
+            <button class="btn subtle" type="button" id="btnSaveAdhocAccount">💾 Lưu tài khoản</button>
+            <button class="btn subtle" type="button" id="btnSaveAdhocPreset">💾 Lưu mẫu chuyển tiền</button>
+          </div>
+
+          <button class="btn primary full" type="submit">Tạo mã QR</button>
+        </form>
+
+        <div class="qr-result-wrap">
+          <div class="qr-card" id="adhocQrCard" hidden>
+            <span class="qr-card-stamp">✓ Đã tạo</span>
+            <div class="qr-card-bank" id="adhocQrCardBank">—</div>
+            <div class="qr-card-imgwrap">
+              <img id="adhocQrImageA" alt="Mã QR chuyển khoản" />
+              <img id="adhocQrImageB" alt="Mã QR chuyển khoản" />
+            </div>
+          </div>
+          <div class="qr-empty" id="adhocQrEmpty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              <path d="M14 14h3v3h-3zM14 20h7M20 14v3M17.5 20v1M20 20v0.01"></path>
+            </svg>
+            <p>Nhập ngân hàng + số tài khoản rồi bấm <strong>Tạo mã QR</strong>.</p>
+          </div>
+          <div class="qr-actions" id="adhocQrActions" hidden>
+            <button class="btn subtle" id="adhocBtnCopyLink" type="button">Sao chép link ảnh</button>
+            <a class="btn subtle" id="adhocBtnOpenLink" href="#" target="_blank" rel="noopener noreferrer">Mở link ảnh</a>
+            <a class="btn primary" id="adhocBtnDownload" download="qr-thanh-toan.png">Tải ảnh QR</a>
           </div>
         </div>
 

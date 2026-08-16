@@ -518,6 +518,9 @@ async function saveAccountsToGithub() {
     );
     if (!ok) return;
   }
+  state.accounts.forEach((acc) => {
+    acc.vietqr_link = buildAccountVietQrLink(acc);
+  });
   const invalidRows = [];
   state.accounts.forEach((acc, i) => {
     const missing = [];
@@ -730,6 +733,11 @@ function mapVietQrApiBanks(payload) {
     shortName: b.shortName,
     logo: b.logo,
     short_name: b.short_name,
+    swift_code: b.swift_code,
+    transferSupported: b.transferSupported,
+    lookupSupported: b.lookupSupported,
+    support: b.support,
+    isTransfer: b.isTransfer,
   }));
 }
 function readRefBanksCache() {
@@ -865,6 +873,11 @@ function renderBankPickerList(idx, query) {
   });
 }
 function selectBankForRow(idx, code) {
+  if (idx === "adhoc") {
+    selectAdhocBank(code);
+    closeBankPicker();
+    return;
+  }
   applyBankToRow(idx, code);
   markDirty("accounts");
   closeBankPicker();
@@ -1119,6 +1132,10 @@ function applyBankToRow(idx, bankCode) {
   row.data__logo = bank.logo;
   row.data__short_name = bank.short_name;
 }
+function buildAccountVietQrLink(acc) {
+  if (!acc || !acc.data__code || !acc.data_num) return "";
+  return buildQrUrlRaw(acc.data__code, acc.data_num, "", "", "compact2", acc.name_ac || "");
+}
 // ---------- Thứ tự hiển thị (STT) ----------
 function renumberAccountsStt() {
   state.accounts.forEach((a, i) => {
@@ -1155,6 +1172,8 @@ function renderTable() {
       if (!hay.includes(q)) return;
     }
     shown++;
+    acc.vietqr_link = buildAccountVietQrLink(acc);
+    const hasLink = !!acc.vietqr_link;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
@@ -1166,6 +1185,10 @@ function renderTable() {
           placeholder="🔎 Tìm ngân hàng…" value="${escapeAttr(bankLabelForRow(acc))}">
       </td>
       <td class="row-actions">
+        ${hasLink
+          ? `<a class="icon-btn" href="${escapeAttr(acc.vietqr_link)}" target="_blank" rel="noopener noreferrer" title="Mở link VietQR">🔗</a>
+             <button class="icon-btn" type="button" title="Sao chép link VietQR" data-copy-link="${idx}">📋</button>`
+          : `<button class="icon-btn" type="button" disabled title="Điền STK &amp; ngân hàng để có link VietQR">🔗</button>`}
         <button class="icon-btn order-btn" title="Đưa lên trên" data-move="${idx}" data-dir="-1" ${!sortable || idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-move="${idx}" data-dir="1" ${!sortable || idx === state.accounts.length - 1 ? "disabled" : ""}>▼</button>
         <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-confirm-row="${idx}">✓</button>
@@ -1195,6 +1218,19 @@ function renderTable() {
 
       const i = Number(e.target.dataset.idx);
       e.target.value = bankLabelForRow(state.accounts[i]);
+    });
+  });
+  body.querySelectorAll("[data-copy-link]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      const idx = Number(e.currentTarget.dataset.copyLink);
+      const link = state.accounts[idx]?.vietqr_link || "";
+      if (!link) return;
+      try {
+        await navigator.clipboard.writeText(link);
+        showToast("Đã sao chép link VietQR", "ok");
+      } catch (err) {
+        showToast("Không sao chép được — hãy sao chép thủ công.", "err");
+      }
     });
   });
   body.querySelectorAll("[data-move]").forEach((btn) => {
@@ -1245,6 +1281,7 @@ async function addRow() {
     data__shortName: defaultBank.shortName || "",
     data__logo: defaultBank.logo || "",
     data__short_name: defaultBank.short_name || "",
+    vietqr_link: "",
   });
   renumberAccountsStt();
   markDirty("accounts");
@@ -1306,34 +1343,6 @@ function setDefaultAccount() {
   defaults.accountKey = accountKey(acc);
   localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
   flashLinkBtn("#btnSetDefaultAccount", "★ ");
-}
-function isDefaultPreset(preset) {
-  const defaults = loadDefaults();
-  return !!(defaults.presetName && preset && preset.name === defaults.presetName);
-}
-function setDefaultPreset(idx) {
-  const preset = state.presets[idx];
-  if (!preset) return;
-  const defaults = loadDefaults();
-  if (defaults.presetName === preset.name) {
-    delete defaults.presetName;
-    showToast("Đã bỏ mẫu mặc định", "ok");
-  } else {
-    defaults.presetName = preset.name;
-    showToast(`Đã đặt "${preset.name}" làm mẫu mặc định`, "ok");
-  }
-  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
-  renderMauList();
-}
-function applyDefaultPresetIfNeeded() {
-  if (state.selectedPresetIdx != null) return;
-  const defaults = loadDefaults();
-  if (!defaults.presetName) return;
-  const idx = state.presets.findIndex((p) => p.name === defaults.presetName);
-  if (idx < 0) return;
-  state.selectedPresetIdx = idx;
-  applyPresetToForm(state.presets[idx]);
-  updateMauActiveUi();
 }
 function isDefaultContent(content) {
   const defaults = loadDefaults();
@@ -1405,11 +1414,14 @@ function restoreFormState() {
 }
 
 function populateQrTemplateOptions() {
-  const sel = $("#qrTemplate");
-  const prev = sel.value;
-  sel.innerHTML = state.templates.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
-  if (prev) sel.value = prev;
-  updateCustomSelectTriggerLabel(sel);
+  const optionsHtml = state.templates.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
+  [$("#qrTemplate"), $("#adhocTemplate")].forEach((sel) => {
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = optionsHtml;
+    if (prev) sel.value = prev;
+    updateCustomSelectTriggerLabel(sel);
+  });
 }
 
 // ---------- Mẫu giao dịch (cửa sổ riêng, tách khỏi form Tạo giao dịch) ----------
@@ -1422,8 +1434,12 @@ function renderMauList() {
 
   state.presets.forEach((p, idx) => {
     const amountText = p.amount ? formatNumber(p.amount) + "đ" : "—";
-    const accText = p.accountName ? escapeHtml(p.accountName) : "(giữ tài khoản hiện tại)";
-    const isDefault = isDefaultPreset(p);
+    let accText = "(giữ tài khoản hiện tại)";
+    if (p.accountName) {
+      accText = escapeHtml(p.accountName);
+    } else if (p.bankCode && p.accountNum) {
+      accText = `${escapeHtml(p.bankCode)} — ${escapeHtml(p.accountNum)} (nhập tay)`;
+    }
     const card = document.createElement("div");
     card.className = "mau-card" + (state.selectedPresetIdx === idx ? " active" : "");
     card.innerHTML = `
@@ -1432,7 +1448,6 @@ function renderMauList() {
         <span class="mau-card-meta">${accText} · ${amountText}</span>
         ${p.content ? `<span class="mau-card-content">${escapeHtml(p.content)}</span>` : ""}
       </button>
-      <button type="button" class="icon-btn mau-card-star${isDefault ? " is-default" : ""}" title="${isDefault ? "Đang là mẫu mặc định — bấm để bỏ" : "Đặt làm mẫu mặc định"}" data-star="${idx}">${isDefault ? "★" : "☆"}</button>
       <button type="button" class="icon-btn mau-card-del" title="Xoá mẫu" data-del="${idx}">✕</button>`;
     wrap.appendChild(card);
   });
@@ -1441,12 +1456,6 @@ function renderMauList() {
 
   wrap.querySelectorAll("[data-select]").forEach((btn) => {
     btn.addEventListener("click", () => selectMau(Number(btn.dataset.select)));
-  });
-  wrap.querySelectorAll("[data-star]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setDefaultPreset(Number(btn.dataset.star));
-    });
   });
   wrap.querySelectorAll("[data-del]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1487,7 +1496,8 @@ function renderMauTable() {
   state.presets.forEach((p, idx) => {
     const acc = findAccountForPreset(p);
     const accIdx = acc ? state.accounts.indexOf(acc) : -1;
-    const unresolved = !acc && (p.accountName || p.accountNum);
+    const isAdhoc = !acc && p.bankCode && p.accountNum;
+    const unresolved = !acc && !isAdhoc && (p.accountName || p.accountNum);
     const tplUnresolved = p.template && !state.templates.some((t) => t.value === p.template);
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -1570,14 +1580,19 @@ function renderVietqrBanksTable(filter) {
         `${b.shortName || ""} ${b.name || ""} ${b.code || ""} ${b.bin || ""}`.toLowerCase().includes(q)
       );
   body.innerHTML = "";
+  const yesNo = (v) => (v ? "✓" : "—");
   list.forEach((b, idx) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
       <td>${b.logo ? `<img src="${escapeAttr(b.logo)}" alt="" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">` : ""}</td>
-      <td data-label="Tên ngân hàng">${escapeHtml(b.shortName || b.name || "")}</td>
+      <td data-label="Tên ngân hàng">${escapeHtml(b.shortName || b.short_name || b.name || "")}</td>
+      <td data-label="Tên đầy đủ" title="${escapeAttr(b.name || "")}">${escapeHtml(b.name || "")}</td>
       <td data-label="Mã">${escapeHtml(b.code || "")}</td>
-      <td data-label="BIN">${escapeHtml(b.bin || "")}</td>`;
+      <td data-label="BIN">${escapeHtml(b.bin || "")}</td>
+      <td data-label="Swift">${escapeHtml(b.swift_code || "")}</td>
+      <td data-label="Chuyển" class="cell-center">${yesNo(b.transferSupported)}</td>
+      <td data-label="Tra cứu" class="cell-center">${yesNo(b.lookupSupported)}</td>`;
     body.appendChild(tr);
   });
   const countEl = $("#vietqrBanksCount");
@@ -1620,13 +1635,17 @@ function clearActivePreset() {
   showToast("Đã bỏ chọn mẫu — số tiền/nội dung đang nhập không còn gắn với mẫu nào.", "ok");
 }
 function applyPresetToForm(preset) {
-  if (preset.accountName || preset.accountNum) {
-    const acc = findAccountForPreset(preset);
-    if (acc) {
-      $("#qrAccount").value = state.accounts.indexOf(acc);
-    } else if (preset.accountName) {
-      showToast(`Không tìm thấy tài khoản "${preset.accountName}" cho mẫu này — giữ nguyên tài khoản đang chọn.`, "err");
-    }
+  const acc = findAccountForPreset(preset);
+  if (acc) {
+    $("#qrAccount").value = state.accounts.indexOf(acc);
+  } else if (preset.bankCode && preset.accountNum) {
+    // Mẫu tạo từ tab "QR cho người khác" — tài khoản không nằm trong danh
+    // sách "Tài khoản" đã lưu, áp thẳng vào tab đó thay vì tab chính.
+    applyPresetToAdhocForm(preset);
+    switchWorkspaceTab("adhoc");
+    return;
+  } else if (preset.accountName) {
+    showToast(`Không tìm thấy tài khoản "${preset.accountName}" cho mẫu này — giữ nguyên tài khoản đang chọn.`, "err");
   }
   if (preset.amount != null && preset.amount !== "") {
     $("#qrAmount").value = formatNumber(preset.amount);
@@ -1639,6 +1658,7 @@ function applyPresetToForm(preset) {
     $("#qrTemplate").value = preset.template;
   }
   $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+  switchWorkspaceTab("qr");
   onGenerateQr(null, { silent: true });
 }
 function selectMau(idx) {
@@ -1648,8 +1668,6 @@ function selectMau(idx) {
   applyPresetToForm(preset);
   renderMauList();
   updateMauActiveUi();
-
-  switchWorkspaceTab("qr");
   saveFormState();
 }
 function deleteMauPreset(idx) {
@@ -1941,6 +1959,171 @@ function onGenerateQr(e, opts) {
   saveFormState();
 }
 
+// ---------- Tab "QR cho người khác" — nhập tay ngân hàng/số TK, không cần có
+// sẵn trong danh sách "Tài khoản" ----------
+let adhocBank = null;
+let adhocQrActiveLayer = "A";
+
+function adhocBankLabel(bank) {
+  if (!bank) return "";
+  return `${bank.shortName || bank.short_name || bank.name || ""} — ${bank.code || ""}`;
+}
+function selectAdhocBank(code) {
+  const bank = state.refBanks.find((b) => b.code === code);
+  if (!bank) return;
+  adhocBank = bank;
+  const input = $("#adhocBankInput");
+  if (input) input.value = adhocBankLabel(bank);
+  generateAdhocQr({ silent: true });
+}
+function setupAdhocBankInput() {
+  const input = $("#adhocBankInput");
+  if (!input || input._adhocBound) return;
+  input._adhocBound = true;
+  input.addEventListener("focus", () => openBankPicker("adhoc", input));
+  input.addEventListener("click", () => openBankPicker("adhoc", input));
+  input.addEventListener("input", (e) => renderBankPickerList("adhoc", e.target.value));
+  input.addEventListener("blur", () => {
+    input.value = adhocBankLabel(adhocBank);
+  });
+}
+function generateAdhocQr(opts) {
+  const silent = opts && opts.silent;
+  const accNum = $("#adhocAccountNum").value.trim();
+  if (!adhocBank || !accNum) {
+    if (!silent) showToast("Chọn ngân hàng và nhập số tài khoản trước.", "err");
+    return;
+  }
+  const amount = rawNumber($("#adhocAmount").value);
+  const content = $("#adhocContent").value.trim();
+  const template = $("#adhocTemplate").value || (state.templates[0] && state.templates[0].value) || "compact2";
+  const accountName = $("#adhocAccountName").value.trim();
+
+  validateAdhocAmount(amount);
+  updateCustomSelectTriggerLabel($("#adhocTemplate"));
+
+  const url = buildQrUrlRaw(adhocBank.code, accNum, amount, content, template, accountName);
+
+  const qrCard = $("#adhocQrCard");
+  const layerNext = adhocQrActiveLayer === "A" ? "B" : "A";
+  const imgNext = $(`#adhocQrImage${layerNext}`);
+  const imgCur = $(`#adhocQrImage${adhocQrActiveLayer}`);
+
+  qrCard.classList.add("loading");
+  imgNext.onload = () => {
+    qrCard.classList.remove("loading");
+    imgNext.classList.add("visible");
+    imgCur.classList.remove("visible");
+    adhocQrActiveLayer = layerNext;
+  };
+  imgNext.onerror = () => {
+    qrCard.classList.remove("loading");
+    showToast("Không tải được ảnh QR — img.vietqr.io có thể đang gián đoạn.", "err");
+  };
+  imgNext.src = url;
+  $("#adhocQrCardBank").textContent = adhocBank.shortName || adhocBank.name || adhocBank.code;
+
+  $("#adhocQrCard").hidden = false;
+  $("#adhocQrEmpty").hidden = true;
+  $("#adhocQrActions").hidden = false;
+  $("#adhocBtnDownload").href = url;
+  $("#adhocBtnOpenLink").href = url;
+  $("#adhocBtnCopyLink").dataset.url = url;
+
+  restartAnimation($("#adhocQrCard"));
+}
+function validateAdhocAmount(rawAmount) {
+  const n = Number(rawAmount);
+  if (rawAmount && n > AMOUNT_WARN_THRESHOLD) {
+    showToast(`Số tiền khá lớn (${formatNumber(n)}đ) — kiểm tra lại trước khi gửi.`, "err");
+  }
+}
+function saveAdhocAsAccount() {
+  if (!adhocBank) {
+    showToast("Chọn ngân hàng trước.", "err");
+    return;
+  }
+  const accNum = $("#adhocAccountNum").value.trim();
+  if (!accNum) {
+    showToast("Nhập số tài khoản trước.", "err");
+    return;
+  }
+  const accountName = $("#adhocAccountName").value.trim();
+  const defaultNick = accountName || `${adhocBank.shortName || adhocBank.code} — ${accNum}`;
+  const nick = window.prompt("Tên gợi nhớ cho tài khoản này:", defaultNick);
+  if (nick == null) return;
+  const trimmed = nick.trim();
+  if (!trimmed) {
+    showToast("Tên gợi nhớ không được để trống", "err");
+    return;
+  }
+  state.accounts.push({
+    data__id: adhocBank.id || 0,
+    list_name: trimmed,
+    data_num: accNum,
+    name_ac: accountName,
+    data__name: adhocBank.shortName || adhocBank.name || "",
+    data__code: adhocBank.code || "",
+    data__bin: adhocBank.bin || "",
+    data__shortName: adhocBank.shortName || "",
+    data__logo: adhocBank.logo || "",
+    data__short_name: adhocBank.short_name || "",
+  });
+  renumberAccountsStt();
+  markDirty("accounts");
+  populateQrAccounts();
+  showToast(`Đã thêm "${trimmed}" vào danh sách tài khoản — vào Cài đặt ▸ Tài khoản để lưu lên GitHub.`, "ok", { duration: 3600 });
+}
+function saveAdhocAsPreset() {
+  if (!adhocBank) {
+    showToast("Chọn ngân hàng trước.", "err");
+    return;
+  }
+  const accNum = $("#adhocAccountNum").value.trim();
+  if (!accNum) {
+    showToast("Nhập số tài khoản trước.", "err");
+    return;
+  }
+  const accountName = $("#adhocAccountName").value.trim();
+  const defaultName = $("#adhocContent").value.trim() || accountName || `${adhocBank.shortName || adhocBank.code} — ${accNum}`;
+  const name = window.prompt("Tên mẫu chuyển tiền:", defaultName);
+  if (name == null) return;
+  const trimmed = name.trim();
+  if (!trimmed) {
+    showToast("Tên mẫu không được để trống", "err");
+    return;
+  }
+  // Mẫu lưu trực tiếp bankCode + accountNum — không cần tài khoản này có
+  // trong danh sách "Tài khoản" đã lưu (khác với mẫu tạo từ tab "Tạo giao
+  // dịch", vốn chỉ tham chiếu tới 1 tài khoản đã lưu qua accountName/accountNum).
+  state.presets.push({
+    name: trimmed,
+    accountName: accountName,
+    accountNum: accNum,
+    bankCode: adhocBank.code,
+    amount: Number(rawNumber($("#adhocAmount").value)) || 0,
+    content: $("#adhocContent").value.trim(),
+    template: $("#adhocTemplate").value,
+  });
+  savePresetsCache();
+  markDirty("presets");
+  renderMauList();
+  showToast(`Đã lưu mẫu "${trimmed}"`, "ok");
+}
+function applyPresetToAdhocForm(preset) {
+  const bank = state.refBanks.find((b) => b.code === preset.bankCode);
+  adhocBank = bank || { code: preset.bankCode, shortName: preset.bankCode };
+  const input = $("#adhocBankInput");
+  if (input) input.value = adhocBankLabel(adhocBank);
+  $("#adhocAccountNum").value = preset.accountNum || "";
+  $("#adhocAccountName").value = preset.accountName || "";
+  $("#adhocAmount").value = preset.amount != null && preset.amount !== "" ? formatNumber(preset.amount) : "";
+  $("#adhocContent").value = preset.content || "";
+  if (preset.template) $("#adhocTemplate").value = preset.template;
+  updateCustomSelectTriggerLabel($("#adhocTemplate"));
+  generateAdhocQr({ silent: true });
+}
+
 // ---------- Cài đặt: Nội dung chuyển khoản (bảng quản lý) ----------
 function renderContentTable() {
   const body = $("#contentTableBody");
@@ -2099,8 +2282,8 @@ async function saveAmountsToGithub() {
 }
 
 // ---------- Nút "số tiền nhanh" trên form — nay lấy từ state.amounts (JSON quản lý được) ----------
-function renderQuickAmountsChips() {
-  const wrap = $("#quickAmounts");
+function renderQuickAmountsInto(wrapSel, inputSel, onPick) {
+  const wrap = $(wrapSel);
   if (!wrap) return;
   const list = state.amounts && state.amounts.length ? state.amounts : DEFAULT_SUGGESTED_AMOUNTS;
   wrap.innerHTML = list
@@ -2108,12 +2291,16 @@ function renderQuickAmountsChips() {
     .join("");
   wrap.querySelectorAll(".chip[data-val]").forEach((chip) => {
     chip.addEventListener("click", () => {
-      $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+      wrap.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
       chip.classList.add("active");
-      $("#qrAmount").value = formatNumber(chip.dataset.val);
-      onGenerateQr(null, { silent: true });
+      $(inputSel).value = formatNumber(chip.dataset.val);
+      onPick();
     });
   });
+}
+function renderQuickAmountsChips() {
+  renderQuickAmountsInto("#quickAmounts", "#qrAmount", () => onGenerateQr(null, { silent: true }));
+  renderQuickAmountsInto("#adhocQuickAmounts", "#adhocAmount", () => generateAdhocQr({ silent: true }));
 }
 function formatCompactAmount(v) {
   const n = Number(v) || 0;
@@ -2185,6 +2372,7 @@ function switchWorkspaceTab(tabName) {
   $$(".workspace-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.workspaceTab === tabName));
   $("#tab-qr").hidden = tabName !== "qr";
   $("#tab-mau").hidden = tabName !== "mau";
+  $("#tab-adhoc").hidden = tabName !== "adhoc";
   if (tabName === "mau") renderMauList();
 }
 
@@ -2293,7 +2481,6 @@ async function clearEnteredInfo() {
   updateContentCounter("");
   $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
   applyDefaults();
-  applyDefaultPresetIfNeeded();
   applyDefaultContentIfNeeded();
   renderMauList();
   updateMauActiveUi();
@@ -2325,6 +2512,8 @@ async function init() {
   applySettingsLock();
   enhanceSelect($("#qrAccount"));
   enhanceSelect($("#qrTemplate"));
+  enhanceSelect($("#adhocTemplate"));
+  setupAdhocBankInput();
 
   $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
   $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
@@ -2365,7 +2554,16 @@ async function init() {
   });
   window.addEventListener(
     "scroll",
-    () => {
+    (e) => {
+      // Bỏ qua sự kiện scroll xảy ra BÊN TRONG chính popup/panel (vd. người
+      // dùng kéo chuột để xem thêm ngân hàng) — nếu không, popup bị đóng
+      // ngay khi vừa bắt đầu cuộn nên không kéo lên/xuống được.
+      const target = e.target;
+      const insidePopup =
+        target &&
+        target.closest &&
+        (target.closest("#bankPickerPopup") || target.closest("#customSelectPanel"));
+      if (insidePopup) return;
       if (bankPickerOpenIdx != null) closeBankPicker();
       if (customSelectOpenEl) closeCustomSelect();
     },
@@ -2427,6 +2625,56 @@ async function init() {
     await saveAmountsToGithub();
   });
   $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
+  $("#btnSaveAsPreset").addEventListener("click", saveCurrentFormAsPreset);
+
+  $("#adhocForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    generateAdhocQr();
+  });
+  $("#adhocBankInput").addEventListener("input", () => generateAdhocQr({ silent: true }));
+  $("#adhocAccountNum").addEventListener("input", () => generateAdhocQr({ silent: true }));
+  $("#adhocAccountName").addEventListener("input", () => generateAdhocQr({ silent: true }));
+  $("#adhocTemplate").addEventListener("change", () => generateAdhocQr({ silent: true }));
+  $("#adhocAmount").addEventListener("input", (e) => {
+    e.target.value = formatNumber(e.target.value);
+    $$("#adhocQuickAmounts .chip").forEach((c) => c.classList.remove("active"));
+    generateAdhocQr({ silent: true });
+  });
+  $("#adhocContent").addEventListener("input", () => generateAdhocQr({ silent: true }));
+  $("#btnSaveAdhocAccount").addEventListener("click", saveAdhocAsAccount);
+  $("#btnSaveAdhocPreset").addEventListener("click", saveAdhocAsPreset);
+  $("#adhocBtnCopyLink").addEventListener("click", async (e) => {
+    const url = e.target.dataset.url;
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    showToast("Đã sao chép link ảnh", "ok");
+  });
+  $("#adhocBtnDownload").addEventListener("click", async (e) => {
+    const url = e.currentTarget.href;
+    if (!url) return;
+    e.preventDefault();
+    const btn = e.currentTarget;
+    const oldLabel = btn.textContent;
+    btn.textContent = "Đang tải…";
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "qr-thanh-toan.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    } catch (err) {
+      console.error(err);
+      showToast("Không tải được ảnh QR về máy — thử \"Mở link ảnh\" rồi lưu thủ công.", "err");
+    } finally {
+      btn.textContent = oldLabel;
+    }
+  });
 
   $("#btnContentSuggestToggle").addEventListener("click", (e) => {
     e.stopPropagation();
@@ -2524,13 +2772,12 @@ async function init() {
   updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
   restoreFormState();
-  // Luôn gọi 2 hàm dưới đây (không chỉ khi chưa có form state đã lưu) vì
-  // bản thân applyDefaultPresetIfNeeded()/applyDefaultContentIfNeeded() đã
-  // tự kiểm tra "đã có preset/nội dung được chọn/nhập chưa" trước khi áp
-  // dụng mặc định — nếu chỉ gọi lúc chưa từng lưu form thì mẫu/nội dung
-  // mặc định do người dùng đặt SAU khi đã dùng app sẽ không bao giờ được
-  // áp dụng lại nữa (vì form state luôn tồn tại sau lần dùng đầu tiên).
-  applyDefaultPresetIfNeeded();
+  // Luôn gọi hàm dưới đây (không chỉ khi chưa có form state đã lưu) vì
+  // applyDefaultContentIfNeeded() tự kiểm tra "đã có nội dung được nhập
+  // chưa" trước khi áp dụng mặc định — nếu chỉ gọi lúc chưa từng lưu form
+  // thì nội dung mặc định do người dùng đặt SAU khi đã dùng app sẽ không
+  // bao giờ được áp dụng lại nữa (vì form state luôn tồn tại sau lần dùng
+  // đầu tiên).
   applyDefaultContentIfNeeded();
   updateContentCounter($("#qrContent").value.trim());
   updateMauActiveUi();
