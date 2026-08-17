@@ -1272,7 +1272,7 @@ async function addRow() {
   const defaultBank = state.refBanks[0] || {};
   state.accounts.push({
     data__id: defaultBank.id || 0,
-    list_name: "Tài khoản mới",
+    list_name: "",
     data_num: "",
     name_ac: "",
     data__name: defaultBank.shortName || "",
