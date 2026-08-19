@@ -1364,6 +1364,13 @@ function applyDefaultContentIfNeeded() {
   const defaults = loadDefaults();
   if (!defaults.contentDefault) return;
   if ($("#qrContent").value.trim()) return;
+  // Nếu người dùng vừa chủ động bấm "Xoá thông tin" (form state có đánh dấu
+  // skipDefaultContent) thì KHÔNG tự điền lại nội dung mặc định — tránh tình
+  // trạng xoá xong F5 lại thấy nội dung "sống lại". Cờ này chỉ có hiệu lực
+  // 1 lần: hễ người dùng gõ gì mới thì lần lưu form state kế tiếp sẽ không
+  // còn cờ này nữa, nội dung mặc định sẽ hoạt động bình thường trở lại.
+  const formState = loadFormStateRaw();
+  if (formState && formState.skipDefaultContent) return;
   $("#qrContent").value = defaults.contentDefault;
   updateContentCounter(defaults.contentDefault.trim());
 }
@@ -1967,8 +1974,11 @@ function toggleContentSuggestions() {
 }
 
 // Nút "Xoá thông tin" — trả form về trạng thái trống: xoá số tiền/nội dung
-// đang nhập, bỏ chọn mẫu đang gắn (nếu có), và xoá luôn form state đã lưu
-// trong trình duyệt để F5 không tự điền lại các giá trị vừa xoá.
+// đang nhập, bỏ chọn mẫu đang gắn (nếu có). Thay vì XOÁ HẲN form state đã
+// lưu, ta LƯU LẠI trạng thái trống này kèm cờ skipDefaultContent — để F5
+// sau đó vẫn giữ nguyên form trống (không bị "nội dung mặc định" tự điền
+// lại, xem applyDefaultContentIfNeeded()). Cờ này tự hết hiệu lực ngay khi
+// người dùng gõ gì mới, vì lần saveFormState() kế tiếp không còn cờ đó nữa.
 function clearQrForm() {
   $("#qrAmount").value = "";
   $("#qrContent").value = "";
@@ -1976,7 +1986,19 @@ function clearQrForm() {
   updateContentCounter("");
   validateAmount("");
   clearActivePreset({ silent: true });
-  clearFormState();
+  try {
+    localStorage.setItem(
+      LS_FORM_STATE,
+      JSON.stringify({
+        accountIdx: Number($("#qrAccount").value) || 0,
+        amount: "",
+        content: "",
+        template: $("#qrTemplate").value,
+        selectedPresetIdx: null,
+        skipDefaultContent: true,
+      })
+    );
+  } catch (e) {}
   $("#qrCard").hidden = true;
   $("#qrEmpty").hidden = false;
   $("#qrActions").hidden = true;
