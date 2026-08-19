@@ -1966,6 +1966,23 @@ function toggleContentSuggestions() {
   else closeContentSuggestions();
 }
 
+// Nút "Xoá thông tin" — trả form về trạng thái trống: xoá số tiền/nội dung
+// đang nhập, bỏ chọn mẫu đang gắn (nếu có), và xoá luôn form state đã lưu
+// trong trình duyệt để F5 không tự điền lại các giá trị vừa xoá.
+function clearQrForm() {
+  $("#qrAmount").value = "";
+  $("#qrContent").value = "";
+  $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
+  updateContentCounter("");
+  validateAmount("");
+  clearActivePreset({ silent: true });
+  clearFormState();
+  $("#qrCard").hidden = true;
+  $("#qrEmpty").hidden = false;
+  $("#qrActions").hidden = true;
+  $("#qrContent").focus();
+  showToast("Đã xoá thông tin đang nhập", "ok");
+}
 function onGenerateQr(e, opts) {
   if (e) e.preventDefault();
   const silent = opts && opts.silent;
@@ -2759,6 +2776,7 @@ async function init() {
   });
   $("#adhocContent").addEventListener("input", () => generateAdhocQr({ silent: true }));
   $("#btnSaveAdhocAccount").addEventListener("click", saveAdhocAsAccount);
+  $("#btnClearQrForm").addEventListener("click", clearQrForm);
   $("#btnSaveAdhocPreset").addEventListener("click", saveAdhocAsPreset);
   $("#adhocBtnCopyLink").addEventListener("click", async (e) => {
     const url = e.target.dataset.url;
