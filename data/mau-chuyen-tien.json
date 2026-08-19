@@ -29,5 +29,13 @@
     "amount": 13131610,
     "content": "Tuan Kiet Chuyen Tien",
     "template": "print"
+  },
+  {
+    "name": "iPA",
+    "accountName": "iPA",
+    "accountNum": "MS00T09548691713297",
+    "amount": 0,
+    "content": "",
+    "template": "BdT8CDO"
   }
 ]
