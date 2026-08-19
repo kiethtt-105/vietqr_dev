@@ -1516,6 +1516,8 @@ function renderMauTable() {
         </select>
       </td>
       <td class="row-actions">
+        <button class="icon-btn order-btn" title="Đưa lên trên" data-mau-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
+        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-mau-move="${idx}" data-dir="1" ${idx === state.presets.length - 1 ? "disabled" : ""}>▼</button>
         <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-mau-tbl-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-mau-tbl-del="${idx}">✕</button>
       </td>`;
@@ -1558,6 +1560,13 @@ function renderMauTable() {
       savePresetsCache();
       markDirty("presets");
       renderMauTable();
+    });
+  });
+  body.querySelectorAll("[data-mau-move]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.mauMove);
+      const dir = Number(e.currentTarget.dataset.dir);
+      movePresetRow(idx, dir);
     });
   });
   body.querySelectorAll("[data-mau-tbl-confirm]").forEach((btn) => {
@@ -1612,27 +1621,62 @@ function addMauRow() {
   const last = inputs[inputs.length - 1];
   if (last) last.focus();
 }
+// So sánh số tiền/nội dung/mẫu hiển thị đang nhập trên form với giá trị đã
+// lưu trong mẫu (preset) đang được chọn — chỉ khi có khác biệt mới cần hiện
+// nút "Cập nhật mẫu" (đổi tài khoản không tính ở đây, vì đổi tài khoản sẽ
+// tự động thoát mẫu, xem checkPresetAccountMismatch()).
+function presetFormDiffers(preset) {
+  if (!preset) return false;
+  const amount = Number(rawNumber($("#qrAmount").value)) || 0;
+  const content = $("#qrContent").value.trim();
+  const template = $("#qrTemplate").value;
+  const presetAmount = Number(preset.amount) || 0;
+  const presetContent = (preset.content || "").trim();
+  const presetTemplate = preset.template || "";
+  return amount !== presetAmount || content !== presetContent || template !== presetTemplate;
+}
 function updateMauActiveUi() {
   const tag = $("#mauActiveTag");
   const nameEl = $("#mauActiveName");
   const updateBtn = $("#btnUpdatePreset");
   if (!tag || !nameEl || !updateBtn) return;
   if (state.selectedPresetIdx != null && state.presets[state.selectedPresetIdx]) {
+    const preset = state.presets[state.selectedPresetIdx];
     tag.hidden = false;
-    nameEl.textContent = state.presets[state.selectedPresetIdx].name || `Mẫu ${state.selectedPresetIdx + 1}`;
-    updateBtn.hidden = false;
+    nameEl.textContent = preset.name || `Mẫu ${state.selectedPresetIdx + 1}`;
+    // Chỉ hiện nút "Cập nhật mẫu" khi số tiền/nội dung/mẫu hiển thị đã bị
+    // đổi khác so với mẫu đang chọn — tránh hiện nút thừa ngay sau khi vừa chọn mẫu.
+    updateBtn.hidden = !presetFormDiffers(preset);
   } else {
     tag.hidden = true;
     updateBtn.hidden = true;
   }
 }
-function clearActivePreset() {
+function clearActivePreset(opts) {
   if (state.selectedPresetIdx == null) return;
   state.selectedPresetIdx = null;
   renderMauList();
   updateMauActiveUi();
   saveFormState();
-  showToast("Đã bỏ chọn mẫu — số tiền/nội dung đang nhập không còn gắn với mẫu nào.", "ok");
+  if (!(opts && opts.silent)) {
+    showToast((opts && opts.message) || "Đã bỏ chọn mẫu — số tiền/nội dung đang nhập không còn gắn với mẫu nào.", "ok");
+  }
+}
+// Khi đang chọn 1 mẫu mà người dùng đổi sang tài khoản KHÁC với tài khoản
+// của mẫu đó (qua dropdown "Tài khoản" trên form chính) — tự động thoát khỏi
+// mẫu đang chọn, vì mẫu giờ không còn khớp với tài khoản đang dùng nữa.
+function checkPresetAccountMismatch() {
+  if (state.selectedPresetIdx == null) return;
+  const preset = state.presets[state.selectedPresetIdx];
+  if (!preset) return;
+  const presetAcc = findAccountForPreset(preset);
+  // Mẫu chưa khớp được tài khoản đã lưu nào (vd. mẫu "QR cho người khác") — không có gì để so sánh.
+  if (!presetAcc) return;
+  const idx = Number($("#qrAccount").value);
+  const acc = state.accounts[idx];
+  if (acc !== presetAcc) {
+    clearActivePreset({ message: `Đã đổi tài khoản khác — thoát khỏi mẫu "${preset.name || `Mẫu ${state.selectedPresetIdx + 1}`}".` });
+  }
 }
 function applyPresetToForm(preset) {
   const acc = findAccountForPreset(preset);
@@ -1690,6 +1734,19 @@ function deleteMauPreset(idx) {
   });
 }
 
+function movePresetRow(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= state.presets.length) return;
+  const tmp = state.presets[idx];
+  state.presets[idx] = state.presets[newIdx];
+  state.presets[newIdx] = tmp;
+  // Giữ đúng mẫu đang được chọn (nếu có) đi theo vị trí mới sau khi đảo chỗ.
+  if (state.selectedPresetIdx === idx) state.selectedPresetIdx = newIdx;
+  else if (state.selectedPresetIdx === newIdx) state.selectedPresetIdx = idx;
+  savePresetsCache();
+  markDirty("presets");
+  renderMauTable();
+}
 function saveCurrentFormAsPreset() {
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
@@ -2135,6 +2192,8 @@ function renderContentTable() {
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Nội dung gợi ý"><input data-content-idx="${idx}" value="${escapeAttr(text)}" title="${escapeAttr(text)}"></td>
       <td class="row-actions">
+        <button class="icon-btn order-btn" title="Đưa lên trên" data-content-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
+        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-content-move="${idx}" data-dir="1" ${idx === state.content.length - 1 ? "disabled" : ""}>▼</button>
         <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-content-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-content-del="${idx}">✕</button>
       </td>`;
@@ -2150,6 +2209,13 @@ function renderContentTable() {
       saveContentCache();
       markDirty("content");
       renderContentSuggestions();
+    });
+  });
+  body.querySelectorAll("[data-content-move]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.contentMove);
+      const dir = Number(e.currentTarget.dataset.dir);
+      moveContentRow(idx, dir);
     });
   });
   body.querySelectorAll("[data-content-confirm]").forEach((btn) => {
@@ -2169,6 +2235,17 @@ function renderContentTable() {
       showToast(`Đã xoá "${removed}"`, "ok");
     });
   });
+}
+function moveContentRow(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= state.content.length) return;
+  const tmp = state.content[idx];
+  state.content[idx] = state.content[newIdx];
+  state.content[newIdx] = tmp;
+  saveContentCache();
+  markDirty("content");
+  renderContentTable();
+  renderContentSuggestions();
 }
 function addContentRow() {
   state.content.push("");
@@ -2191,6 +2268,8 @@ function renderAmountsTable() {
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Số tiền gợi ý (đ)"><input data-amount-idx="${idx}" inputmode="numeric" value="${escapeAttr(formatNumber(amount))}" title="${escapeAttr(formatNumber(amount))}"></td>
       <td class="row-actions">
+        <button class="icon-btn order-btn" title="Đưa lên trên" data-amount-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
+        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-amount-move="${idx}" data-dir="1" ${idx === state.amounts.length - 1 ? "disabled" : ""}>▼</button>
         <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-amount-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-amount-del="${idx}">✕</button>
       </td>`;
@@ -2210,6 +2289,13 @@ function renderAmountsTable() {
       renderQuickAmountsChips();
     });
   });
+  body.querySelectorAll("[data-amount-move]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.amountMove);
+      const dir = Number(e.currentTarget.dataset.dir);
+      moveAmountRow(idx, dir);
+    });
+  });
   body.querySelectorAll("[data-amount-confirm]").forEach((btn) => {
     btn.addEventListener("click", () => saveAmountsToGithub());
   });
@@ -2227,6 +2313,17 @@ function renderAmountsTable() {
       showToast(`Đã xoá ${formatNumber(removed)}đ`, "ok");
     });
   });
+}
+function moveAmountRow(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= state.amounts.length) return;
+  const tmp = state.amounts[idx];
+  state.amounts[idx] = state.amounts[newIdx];
+  state.amounts[newIdx] = tmp;
+  saveAmountsCache();
+  markDirty("amounts");
+  renderAmountsTable();
+  renderQuickAmountsChips();
 }
 function addAmountRow() {
   state.amounts.push(0);
@@ -2321,6 +2418,8 @@ function renderTemplatesTable() {
       <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}" title="${escapeAttr(t.value)}"></td>
       <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"></td>
       <td class="row-actions">
+        <button class="icon-btn order-btn" title="Đưa lên trên" data-tpl-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
+        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-tpl-move="${idx}" data-dir="1" ${idx === state.templates.length - 1 ? "disabled" : ""}>▼</button>
         <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-tpl-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
       </td>`;
@@ -2337,6 +2436,13 @@ function renderTemplatesTable() {
       saveTemplatesCache();
       markDirty("templates");
       populateQrTemplateOptions();
+    });
+  });
+  body.querySelectorAll("[data-tpl-move]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.tplMove);
+      const dir = Number(e.currentTarget.dataset.dir);
+      moveTemplateRow(idx, dir);
     });
   });
   body.querySelectorAll("[data-tpl-confirm]").forEach((btn) => {
@@ -2356,6 +2462,17 @@ function renderTemplatesTable() {
       showToast(`Đã xoá "${removed.label || removed.value}"`, "ok");
     });
   });
+}
+function moveTemplateRow(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= state.templates.length) return;
+  const tmp = state.templates[idx];
+  state.templates[idx] = state.templates[newIdx];
+  state.templates[newIdx] = tmp;
+  saveTemplatesCache();
+  markDirty("templates");
+  renderTemplatesTable();
+  populateQrTemplateOptions();
 }
 function addTemplateRow() {
   state.templates.push({ value: "", label: "" });
@@ -2717,16 +2834,20 @@ async function init() {
 
   const liveGenerate = debounce(() => onGenerateQr(null, { silent: true }), 350);
   $("#qrAccount").addEventListener("change", () => {
+    checkPresetAccountMismatch();
     onGenerateQr(null, { silent: true });
   });
   $("#qrTemplate").addEventListener("change", () => {
+    updateMauActiveUi();
     onGenerateQr(null, { silent: true });
   });
   $("#qrAmount").addEventListener("input", () => {
+    updateMauActiveUi();
     liveGenerate();
   });
   $("#qrContent").addEventListener("input", (e) => {
     updateContentCounter(e.target.value.trim());
+    updateMauActiveUi();
     liveGenerate();
   });
   $("#btnCopyLink").addEventListener("click", async (e) => {
