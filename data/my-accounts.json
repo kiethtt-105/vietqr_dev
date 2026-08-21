@@ -127,9 +127,9 @@
   },
   {
     "data__id": 45,
-    "list_name": "VIB 052004",
+    "list_name": "VIB - 052004",
     "data_num": "052004",
-    "name_ac": "Huynh Tran Tuan Kiet",
+    "name_ac": "HUYNH TRAN TUAN KIET",
     "data__name": "VIB",
     "data__code": "VIB",
     "data__bin": "970441",
@@ -137,6 +137,6 @@
     "data__logo": "https://cdn.vietqr.io/img/VIB.png",
     "data__short_name": "VIB",
     "stt": 10,
-    "vietqr_link": "https://img.vietqr.io/image/VIB-052004-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
+    "vietqr_link": "https://img.vietqr.io/image/VIB-052004-compact2.png?accountName=HUYNH+TRAN+TUAN+KIET"
   }
 ]
