@@ -12,7 +12,7 @@
     "data__short_name": "Vietcombank",
     "stt": 1,
     "vietqr_link": "https://img.vietqr.io/image/VCB-1031451081-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
-    "hidden": true,
+    "hidden": false,
     "isDefault": false
   },
   {
