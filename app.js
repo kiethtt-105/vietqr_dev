@@ -8,7 +8,7 @@ const LS_AMOUNTS_CACHE = "vietqr_amounts_cache";
 const LS_DEFAULTS = "vietqr_defaults";
 const LS_FORM_STATE = "vietqr_form_state";
 const LS_REFBANKS_CACHE = "vietqr_refbanks_cache";
-const LS_THEME = "vietqr_theme";
+const LS_THEME = "vietqr_theme_v2";
 const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000;
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";

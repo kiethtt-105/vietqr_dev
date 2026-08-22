@@ -7,8 +7,8 @@
 <script>
 (function(){
   try{
-    var saved=localStorage.getItem("vietqr_theme");
-    var theme=saved||((window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches)?"light":"dark");
+    var saved=localStorage.getItem("vietqr_theme_v2");
+    var theme=saved||"light";
     document.documentElement.setAttribute("data-theme",theme);
   }catch(e){}
 })();
@@ -33,16 +33,20 @@
     </div>
 
     <div class="topbar-actions">
-      <div class="gh-status-pill" id="ghStatusPill" title="Trạng thái kết nối GitHub">
-        <span class="dot" id="ghDot"></span>
-        <span id="ghStatusLabel">Chưa kết nối GitHub</span>
+      <div class="topbar-status-group">
+        <div class="gh-status-pill" id="ghStatusPill" title="Trạng thái kết nối GitHub">
+          <span class="dot" id="ghDot"></span>
+          <span id="ghStatusLabel">Chưa kết nối GitHub</span>
+        </div>
+        <div class="gh-status-pill autosave-pill" id="autosavePill" title="Trạng thái tự động lưu" hidden>
+          <span class="dot" id="autosaveDot"></span>
+          <span id="autosaveLabel">Đang lưu…</span>
+        </div>
       </div>
-      <div class="gh-status-pill autosave-pill" id="autosavePill" title="Trạng thái tự động lưu" hidden>
-        <span class="dot" id="autosaveDot"></span>
-        <span id="autosaveLabel">Đang lưu…</span>
+      <div class="topbar-control-group">
+        <button class="btn ghost icon-only" id="btnToggleTheme" type="button" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối">🌙</button>
+        <button class="btn ghost icon-only" id="btnOpenSettings" type="button" title="Cài đặt" aria-label="Cài đặt">⚙</button>
       </div>
-      <button class="btn ghost icon-only" id="btnToggleTheme" type="button" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối">🌙</button>
-      <button class="btn ghost icon-only" id="btnOpenSettings" type="button" title="Cài đặt" aria-label="Cài đặt">⚙</button>
     </div>
   </header>
 
