@@ -11,7 +11,9 @@
     "data__logo": "https://cdn.vietqr.io/img/VCB.png",
     "data__short_name": "Vietcombank",
     "stt": 1,
-    "vietqr_link": "https://img.vietqr.io/image/VCB-1031451081-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
+    "vietqr_link": "https://img.vietqr.io/image/VCB-1031451081-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
+    "hidden": false,
+    "isDefault": true
   },
   {
     "data__id": 38,
@@ -25,7 +27,9 @@
     "data__logo": "https://cdn.vietqr.io/img/TCB.png",
     "data__short_name": "Techcombank",
     "stt": 2,
-    "vietqr_link": "https://img.vietqr.io/image/TCB-44699999999-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
+    "vietqr_link": "https://img.vietqr.io/image/TCB-44699999999-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 21,
@@ -39,7 +43,9 @@
     "data__logo": "https://cdn.vietqr.io/img/MB.png",
     "data__short_name": "MBBank",
     "stt": 3,
-    "vietqr_link": "https://img.vietqr.io/image/MB-9704229201938102578-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
+    "vietqr_link": "https://img.vietqr.io/image/MB-9704229201938102578-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 17,
@@ -53,7 +59,9 @@
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank",
     "stt": 4,
-    "vietqr_link": "https://img.vietqr.io/image/ICB-105878043349-compact2.png?accountName=Phan+Le+Duy+Khoi"
+    "vietqr_link": "https://img.vietqr.io/image/ICB-105878043349-compact2.png?accountName=Phan+Le+Duy+Khoi",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 43,
@@ -67,7 +75,9 @@
     "data__logo": "https://cdn.vietqr.io/img/VCB.png",
     "data__short_name": "Vietcombank",
     "stt": 5,
-    "vietqr_link": "https://img.vietqr.io/image/VCB-SPAY126223392538231-compact2.png?accountName=ShopeePay++HUYNH+TRAN+TUAN+KIET"
+    "vietqr_link": "https://img.vietqr.io/image/VCB-SPAY126223392538231-compact2.png?accountName=ShopeePay++HUYNH+TRAN+TUAN+KIET",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 65,
@@ -81,7 +91,9 @@
     "data__logo": "https://cdn.vietqr.io/img/momo.png",
     "data__short_name": "MoMo",
     "stt": 6,
-    "vietqr_link": "https://img.vietqr.io/image/momo-PSP2605516100000204-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
+    "vietqr_link": "https://img.vietqr.io/image/momo-PSP2605516100000204-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 17,
@@ -95,7 +107,9 @@
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank",
     "stt": 7,
-    "vietqr_link": "https://img.vietqr.io/image/ICB-150010000111-compact2.png?accountName=CONG+TY+TNHH+GRAB"
+    "vietqr_link": "https://img.vietqr.io/image/ICB-150010000111-compact2.png?accountName=CONG+TY+TNHH+GRAB",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 47,
@@ -109,7 +123,9 @@
     "data__logo": "https://cdn.vietqr.io/img/VPB.png",
     "data__short_name": "VPBank",
     "stt": 8,
-    "vietqr_link": "https://img.vietqr.io/image/VPB-4681010052004-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
+    "vietqr_link": "https://img.vietqr.io/image/VPB-4681010052004-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 45,
@@ -123,7 +139,9 @@
     "data__logo": "https://cdn.vietqr.io/img/VIB.png",
     "data__short_name": "VIB",
     "stt": 9,
-    "vietqr_link": "https://img.vietqr.io/image/VIB-052004-compact2.png?accountName=HUYNH+TRAN+TUAN+KIET"
+    "vietqr_link": "https://img.vietqr.io/image/VIB-052004-compact2.png?accountName=HUYNH+TRAN+TUAN+KIET",
+    "hidden": false,
+    "isDefault": false
   },
   {
     "data__id": 65,
@@ -137,6 +155,8 @@
     "data__logo": "https://cdn.vietqr.io/img/momo.png",
     "data__short_name": "MoMo",
     "vietqr_link": "https://img.vietqr.io/image/momo-PSP2623411000000071-compact2.png?accountName=Huynh+Tran+Tuan+Kiet",
-    "stt": 10
+    "stt": 10,
+    "hidden": false,
+    "isDefault": false
   }
 ]
