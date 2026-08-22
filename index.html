@@ -22,6 +22,12 @@
 </head>
 <body>
 
+<div class="bg-aurora" aria-hidden="true">
+  <span class="bg-blob bg-blob-a"></span>
+  <span class="bg-blob bg-blob-b"></span>
+  <span class="bg-blob bg-blob-c"></span>
+</div>
+
 <div class="app">
 
   <header class="topbar">
@@ -69,14 +75,20 @@
         <button class="icon-btn" id="btnSettingsClose" type="button" aria-label="Đóng">✕</button>
       </div>
 
-      <nav class="tabs settings-tabs">
-        <button class="tab active" type="button" data-settings-tab="accounts">Tài khoản</button>
-        <button class="tab" type="button" data-settings-tab="content">Nội dung</button>
-        <button class="tab" type="button" data-settings-tab="amounts">Số tiền gợi ý</button>
-        <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
-        <button class="tab" type="button" data-settings-tab="mau">Mẫu chuyển tiền</button>
-        <button class="tab" type="button" data-settings-tab="vietqr">VietQR</button>
-        <button class="tab" type="button" data-settings-tab="github">GitHub</button>
+      <nav class="settings-tabs" aria-label="Danh mục cài đặt">
+        <div class="settings-tabs-group">
+          <span class="settings-tabs-group-label">Thêm &amp; quản lý</span>
+          <button class="tab active" type="button" data-settings-tab="accounts">Tài khoản</button>
+          <button class="tab" type="button" data-settings-tab="content">Nội dung</button>
+          <button class="tab" type="button" data-settings-tab="amounts">Số tiền gợi ý</button>
+          <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
+          <button class="tab" type="button" data-settings-tab="mau">Mẫu chuyển tiền</button>
+          <button class="tab" type="button" data-settings-tab="vietqr">VietQR</button>
+        </div>
+        <div class="settings-tabs-group">
+          <span class="settings-tabs-group-label">Kết nối</span>
+          <button class="tab" type="button" data-settings-tab="github">GitHub</button>
+        </div>
       </nav>
 
       <div class="settings-tabs-viewport" id="settingsTabsViewport">
@@ -301,6 +313,7 @@
     </section>
   </div>
 
+  <div class="app-shell">
   <nav class="tabs workspace-tabs">
     <button class="tab active" type="button" data-workspace-tab="qr">Tạo giao dịch</button>
     <button class="tab" type="button" data-workspace-tab="mau">Mẫu giao dịch</button>
@@ -484,6 +497,8 @@
       </div>
 
     </section>
+
+  </div>
 
   </div>
 
