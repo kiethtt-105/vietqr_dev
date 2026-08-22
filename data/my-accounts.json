@@ -15,20 +15,6 @@
   },
   {
     "data__id": 38,
-    "list_name": "iPA",
-    "data_num": "MS00T09548691713297",
-    "name_ac": "Huynh Tran Tuan Kiet",
-    "data__name": "Techcombank",
-    "data__code": "TCB",
-    "data__bin": "970407",
-    "data__shortName": "Techcombank",
-    "data__logo": "https://cdn.vietqr.io/img/TCB.png",
-    "data__short_name": "Techcombank",
-    "stt": 2,
-    "vietqr_link": "https://img.vietqr.io/image/TCB-MS00T09548691713297-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
-  },
-  {
-    "data__id": 38,
     "list_name": "Techcombank",
     "data_num": "44699999999",
     "name_ac": "Huynh Tran Tuan Kiet",
@@ -38,7 +24,7 @@
     "data__shortName": "Techcombank",
     "data__logo": "https://cdn.vietqr.io/img/TCB.png",
     "data__short_name": "Techcombank",
-    "stt": 3,
+    "stt": 2,
     "vietqr_link": "https://img.vietqr.io/image/TCB-44699999999-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
   },
   {
@@ -52,7 +38,7 @@
     "data__shortName": "MBBank",
     "data__logo": "https://cdn.vietqr.io/img/MB.png",
     "data__short_name": "MBBank",
-    "stt": 4,
+    "stt": 3,
     "vietqr_link": "https://img.vietqr.io/image/MB-9704229201938102578-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
   },
   {
@@ -66,7 +52,7 @@
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank",
-    "stt": 5,
+    "stt": 4,
     "vietqr_link": "https://img.vietqr.io/image/ICB-105878043349-compact2.png?accountName=Phan+Le+Duy+Khoi"
   },
   {
@@ -80,7 +66,7 @@
     "data__shortName": "Vietcombank",
     "data__logo": "https://cdn.vietqr.io/img/VCB.png",
     "data__short_name": "Vietcombank",
-    "stt": 6,
+    "stt": 5,
     "vietqr_link": "https://img.vietqr.io/image/VCB-SPAY126223392538231-compact2.png?accountName=ShopeePay++HUYNH+TRAN+TUAN+KIET"
   },
   {
@@ -94,7 +80,7 @@
     "data__shortName": "MoMo",
     "data__logo": "https://cdn.vietqr.io/img/momo.png",
     "data__short_name": "MoMo",
-    "stt": 7,
+    "stt": 6,
     "vietqr_link": "https://img.vietqr.io/image/momo-PSP2605516100000204-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
   },
   {
@@ -108,7 +94,7 @@
     "data__shortName": "VietinBank",
     "data__logo": "https://cdn.vietqr.io/img/ICB.png",
     "data__short_name": "VietinBank",
-    "stt": 8,
+    "stt": 7,
     "vietqr_link": "https://img.vietqr.io/image/ICB-150010000111-compact2.png?accountName=CONG+TY+TNHH+GRAB"
   },
   {
@@ -122,7 +108,7 @@
     "data__shortName": "VPBank",
     "data__logo": "https://cdn.vietqr.io/img/VPB.png",
     "data__short_name": "VPBank",
-    "stt": 9,
+    "stt": 8,
     "vietqr_link": "https://img.vietqr.io/image/VPB-4681010052004-compact2.png?accountName=Huynh+Tran+Tuan+Kiet"
   },
   {
@@ -136,7 +122,7 @@
     "data__shortName": "VIB",
     "data__logo": "https://cdn.vietqr.io/img/VIB.png",
     "data__short_name": "VIB",
-    "stt": 10,
+    "stt": 9,
     "vietqr_link": "https://img.vietqr.io/image/VIB-052004-compact2.png?accountName=HUYNH+TRAN+TUAN+KIET"
   }
 ]
