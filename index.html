@@ -37,6 +37,10 @@
         <span class="dot" id="ghDot"></span>
         <span id="ghStatusLabel">Chưa kết nối GitHub</span>
       </div>
+      <div class="gh-status-pill autosave-pill" id="autosavePill" title="Trạng thái tự động lưu" hidden>
+        <span class="dot" id="autosaveDot"></span>
+        <span id="autosaveLabel">Đang lưu…</span>
+      </div>
       <button class="btn ghost icon-only" id="btnToggleTheme" type="button" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối">🌙</button>
       <button class="btn ghost icon-only" id="btnOpenSettings" type="button" title="Cài đặt" aria-label="Cài đặt">⚙</button>
     </div>
@@ -81,7 +85,6 @@
           <div class="panel-head-actions">
             <button class="icon-btn" id="btnRefreshBanks" type="button" title="Làm mới danh sách ngân hàng từ VietQR" aria-label="Làm mới ngân hàng">⟳</button>
             <button class="btn subtle" id="btnAddRow" type="button">+ Thêm dòng</button>
-            <button class="btn primary" id="btnSaveGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -108,7 +111,6 @@
           </div>
           <div class="panel-head-actions">
             <button class="btn subtle" id="btnAddContentRow" type="button">+ Thêm dòng</button>
-            <button class="btn primary" id="btnSaveContentGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -132,7 +134,6 @@
           </div>
           <div class="panel-head-actions">
             <button class="btn subtle" id="btnAddAmountRow" type="button">+ Thêm dòng</button>
-            <button class="btn primary" id="btnSaveAmountsGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -156,7 +157,6 @@
           </div>
           <div class="panel-head-actions">
             <button class="btn subtle" id="btnAddTemplateRow" type="button">+ Thêm dòng</button>
-            <button class="btn primary" id="btnSaveTemplatesGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -181,7 +181,6 @@
           </div>
           <div class="panel-head-actions">
             <button class="btn subtle" id="btnAddMauRow" type="button">+ Thêm dòng</button>
-            <button class="btn primary js-save-mau-btn" id="btnSaveMauSettingsGithub" type="button">Lưu lên GitHub</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -287,10 +286,11 @@
 
         <div class="gh-actions">
           <button class="btn primary" id="btnGhSave" type="button">Lưu thông tin kết nối</button>
-          <button class="btn" id="btnGhLoad" type="button">Tải dữ liệu từ GitHub</button>
           <button class="btn subtle" id="btnGhForget" type="button">Xoá token khỏi trình duyệt</button>
         </div>
 
+        <p class="settings-hint">Dữ liệu sẽ tự động tải khi mở lại trang, và tự động lưu lên GitHub ngay khi bạn thêm/sửa/xoá — không cần bấm nút lưu thủ công.</p>
+        <p class="settings-hint">Các tab khác (Tài khoản, Nội dung, Số tiền, Mẫu hiển thị, Mẫu chuyển tiền, Ngân hàng VietQR) chỉ hiện ra sau khi token được xác thực thành công (có quyền ghi vào repo).</p>
         <p class="status" id="ghMsg"></p>
       </div>
       </div>
@@ -311,7 +311,6 @@
       </div>
       <div class="mau-list" id="mauList"></div>
       <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — điền form ở tab "Tạo giao dịch" rồi lưu.</p>
-      <button class="btn subtle full js-save-mau-btn" id="btnSaveMauGithub" type="button">Lưu mẫu lên GitHub</button>
     </section>
 
     <section class="panel" id="tab-qr">

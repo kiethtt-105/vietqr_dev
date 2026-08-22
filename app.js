@@ -48,6 +48,10 @@ let state = {
     pathContent: "data/noi-dung-chuyen-khoan.json",
     pathTemplates: "data/templates.json",
     pathAmounts: "data/so-tien-goi-y.json",
+    // true chỉ khi đã kiểm tra thành công quyền ghi (push) lên repo GitHub.
+    // Các tab dữ liệu (tài khoản, nội dung, số tiền, mẫu hiển thị, mẫu chuyển tiền,
+    // ngân hàng VietQR) chỉ hiện ra khi cờ này = true.
+    authenticated: false,
   },
 };
 
@@ -191,16 +195,6 @@ function updateDirtyIndicators() {
   const workspaceMauTab = $('.workspace-tabs .tab[data-workspace-tab="mau"]');
   if (workspaceMauTab) workspaceMauTab.classList.toggle("has-unsaved", !!state.dirty.presets);
 }
-function markDirty(key) {
-  if (!(key in state.dirty)) return;
-  state.dirty[key] = true;
-  updateDirtyIndicators();
-}
-function clearDirty(key) {
-  if (!(key in state.dirty)) return;
-  state.dirty[key] = false;
-  updateDirtyIndicators();
-}
 function debounce(fn, ms) {
   let t;
   return (...args) => {
@@ -209,11 +203,79 @@ function debounce(fn, ms) {
   };
 }
 
+// ---------- Tự động lưu lên GitHub (không còn nút "Lưu lên GitHub" thủ công) ----------
+// Mỗi khi 1 nhóm dữ liệu bị đánh dấu "dirty" (có sửa/thêm/xoá), sau AUTO_SAVE_DEBOUNCE_MS
+// không còn thay đổi gì thêm thì tự động lưu nhóm đó lên GitHub. Gộp nhiều lần sửa liên
+// tiếp (gõ từng ký tự...) thành 1 lần ghi để tránh spam API GitHub.
+const AUTO_SAVE_DEBOUNCE_MS = 1200;
+const AUTO_SAVE_FN_BY_KEY = {
+  accounts: () => saveAccountsToGithub(),
+  presets: () => savePresetsToGithub(),
+  content: () => saveContentToGithub(),
+  templates: () => saveTemplatesToGithub(),
+  amounts: () => saveAmountsToGithub(),
+};
+const _autoSaveDebounced = {};
+let _autoSaveInFlight = 0;
+
+function setAutoSaveIndicator(mode, text) {
+  const pill = $("#autosavePill");
+  const dot = $("#autosaveDot");
+  const label = $("#autosaveLabel");
+  if (!pill || !dot || !label) return;
+  if (mode === "idle") {
+    pill.hidden = true;
+    return;
+  }
+  pill.hidden = false;
+  dot.className = "dot" + (mode === "saving" ? " saving" : mode === "ok" ? " on" : mode === "err" ? " err" : "");
+  label.textContent =
+    text || (mode === "saving" ? "Đang lưu…" : mode === "ok" ? "Đã lưu ✓" : mode === "err" ? "Lỗi lưu" : "");
+  if (mode === "ok") {
+    setTimeout(() => {
+      if (_autoSaveInFlight === 0) setAutoSaveIndicator("idle");
+    }, 1800);
+  }
+}
+
+function canAutoSave() {
+  return !!(state.gh.owner && state.gh.repo && getToken());
+}
+
+function scheduleAutoSave(key) {
+  const run = AUTO_SAVE_FN_BY_KEY[key];
+  if (!run || !canAutoSave()) return;
+  if (!_autoSaveDebounced[key]) {
+    _autoSaveDebounced[key] = debounce(async () => {
+      _autoSaveInFlight++;
+      setAutoSaveIndicator("saving");
+      try {
+        await run();
+      } finally {
+        _autoSaveInFlight--;
+      }
+    }, AUTO_SAVE_DEBOUNCE_MS);
+  }
+  _autoSaveDebounced[key]();
+}
+
+function markDirty(key) {
+  if (!(key in state.dirty)) return;
+  state.dirty[key] = true;
+  updateDirtyIndicators();
+  scheduleAutoSave(key);
+}
+function clearDirty(key) {
+  if (!(key in state.dirty)) return;
+  state.dirty[key] = false;
+  updateDirtyIndicators();
+}
+
 // ---------- GitHub config persistence ----------
 function loadGhConfigFromStorage() {
   try {
     const cfg = JSON.parse(localStorage.getItem(LS_GH_CONFIG) || "{}");
-    state.gh = { ...state.gh, ...cfg };
+    state.gh = { ...state.gh, ...cfg, authenticated: false };
   } catch (e) {}
   $("#ghOwner").value = state.gh.owner || "";
   $("#ghRepo").value = state.gh.repo || "";
@@ -263,7 +325,8 @@ function ghApiUrl(path) {
   return `https://api.github.com/repos/${state.gh.owner}/${state.gh.repo}/contents/${path}`;
 }
 
-async function checkGhConnection() {
+async function checkGhConnection(opts) {
+  const silent = !!(opts && opts.silent);
   const owner = $("#ghOwner").value.trim();
   const repo = $("#ghRepo").value.trim();
   const token = $("#ghToken").value.trim() || getToken();
@@ -271,14 +334,16 @@ async function checkGhConnection() {
   const msgEl = $("#ghCheckMsg");
 
   if (!owner || !repo) {
-    setStatus(msgEl, "Nhập owner/repo trước đã.", "err");
+    if (!silent) setStatus(msgEl, "Nhập owner/repo trước đã.", "err");
     return;
   }
 
-  btn.disabled = true;
-  const oldLabel = btn.textContent;
-  btn.textContent = "Đang kiểm tra…";
-  setStatus(msgEl, "");
+  if (!silent) {
+    btn.disabled = true;
+    var oldLabel = btn.textContent;
+    btn.textContent = "Đang kiểm tra…";
+    setStatus(msgEl, "");
+  }
 
   try {
     const headers = { Accept: "application/vnd.github+json" };
@@ -299,25 +364,33 @@ async function checkGhConnection() {
     const perm = data.permissions || {};
 
     if (!token) {
-      setStatus(msgEl, `Repo ${owner}/${repo} tồn tại và công khai. Nhập token để kiểm tra quyền ghi.`, "ok");
+      if (!silent) setStatus(msgEl, `Repo ${owner}/${repo} tồn tại và công khai. Nhập token để kiểm tra quyền ghi.`, "ok");
       $("#ghDot").className = "dot";
+      state.gh.authenticated = false;
     } else if (perm.push) {
-      setStatus(msgEl, `Kết nối OK ✓ — token có quyền ghi vào ${owner}/${repo}.`, "ok");
+      if (!silent) setStatus(msgEl, `Kết nối OK ✓ — token có quyền ghi vào ${owner}/${repo}.`, "ok");
       $("#ghDot").className = "dot on";
+      state.gh.authenticated = true;
     } else if (perm.pull) {
-      setStatus(msgEl, "Repo tồn tại nhưng token chỉ có quyền đọc — cấp lại quyền Contents: Read and write.", "err");
+      if (!silent) setStatus(msgEl, "Repo tồn tại nhưng token chỉ có quyền đọc — cấp lại quyền Contents: Read and write.", "err");
       $("#ghDot").className = "dot err";
+      state.gh.authenticated = false;
     } else {
-      setStatus(msgEl, "Đã kết nối tới repo nhưng không xác định được quyền ghi của token.", "err");
+      if (!silent) setStatus(msgEl, "Đã kết nối tới repo nhưng không xác định được quyền ghi của token.", "err");
       $("#ghDot").className = "dot err";
+      state.gh.authenticated = false;
     }
   } catch (err) {
     console.error(err);
-    setStatus(msgEl, err.message, "err");
+    if (!silent) setStatus(msgEl, err.message, "err");
     $("#ghDot").className = "dot err";
+    state.gh.authenticated = false;
   } finally {
-    btn.disabled = false;
-    btn.textContent = oldLabel;
+    if (!silent) {
+      btn.disabled = false;
+      btn.textContent = oldLabel;
+    }
+    applySettingsLock();
   }
 }
 
@@ -380,6 +453,10 @@ async function ghWriteJson(path, data, sha, message) {
     return await put(latest.sha);
   }
 }
+// NOTE: không còn nút "Tải dữ liệu từ GitHub" thủ công (đã bỏ) — hàm dưới đây tạm thời
+// không còn được gọi ở đâu. Việc tải dữ liệu hiện do syncFromGithubSilently() đảm nhiệm
+// lúc khởi động. Sẽ xử lý lại toàn bộ luồng tải/làm mới dữ liệu ở phần "F5 reload mới hoàn
+// toàn" (Phase 3) — giữ nguyên hàm này ở đây để không phải viết lại từ đầu.
 async function loadAllFromGithub() {
   syncGhInputsToState();
   if (!state.gh.owner || !state.gh.repo) {
@@ -390,7 +467,7 @@ async function loadAllFromGithub() {
   try {
     const acc = await ghReadJson(state.gh.pathAccounts);
     if (acc.data) {
-      state.accounts = acc.data;
+      state.accounts = normalizeAccountFields(acc.data);
       state.sha.accounts = acc.sha;
       sortAccountsByStt();
       localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
@@ -449,7 +526,7 @@ async function syncFromGithubSilently() {
     let changed = false;
     const acc = await ghReadJson(state.gh.pathAccounts);
     if (acc.data) {
-      state.accounts = acc.data;
+      state.accounts = normalizeAccountFields(acc.data);
       state.sha.accounts = acc.sha;
       sortAccountsByStt();
       localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
@@ -506,18 +583,7 @@ async function syncFromGithubSilently() {
 
 async function saveAccountsToGithub() {
   syncGhInputsToState();
-  if (!state.gh.owner || !state.gh.repo) {
-    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
-    openSettingsModal("github");
-    return;
-  }
-  if (!state.accounts.length) {
-    const ok = await showConfirm(
-      "Danh sách tài khoản đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu tài khoản đang có trên GitHub. Vẫn tiếp tục?",
-      "Vẫn lưu (xoá hết)"
-    );
-    if (!ok) return;
-  }
+  if (!state.gh.owner || !state.gh.repo || !getToken()) return;
   state.accounts.forEach((acc) => {
     acc.vietqr_link = buildAccountVietQrLink(acc);
   });
@@ -532,16 +598,12 @@ async function saveAccountsToGithub() {
   });
   if (invalidRows.length) {
     const detail = invalidRows.map((r) => `dòng ${r.row} (thiếu ${r.missing.join(", ")})`).join("; ");
-    setStatus($("#ghMsg"), `Chưa lưu được: ${detail}. Điền đủ hoặc xoá dòng đó trước khi lưu.`, "err");
-    showToast("Còn dòng tài khoản chưa điền đủ thông tin", "err");
-    openSettingsModal("accounts");
+    setAutoSaveIndicator("err", "Chưa lưu — thiếu dữ liệu");
+    setStatus($("#ghMsg"), `Chưa lưu được: ${detail}. Điền đủ hoặc xoá dòng đó.`, "err");
     return;
   }
-  const btn = $("#btnSaveGithub");
-  btn.classList.add("is-loading");
-  btn.disabled = true;
-  setStatus($("#ghMsg"), "Đang lưu tài khoản lên GitHub…");
   try {
+    localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
     state.sha.accounts = await ghWriteJson(
       state.gh.pathAccounts,
       state.accounts,
@@ -549,26 +611,19 @@ async function saveAccountsToGithub() {
       `chore: cập nhật my-accounts.json (${new Date().toISOString()})`
     );
     setStatus($("#ghMsg"), "Đã lưu danh sách tài khoản lên GitHub ✓", "ok");
-    showToast("Đã lưu tài khoản lên GitHub ✓", "ok");
+    setAutoSaveIndicator("ok");
     clearDirty("accounts");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    showToast("Lỗi khi lưu lên GitHub", "err");
-    openSettingsModal("github");
-  } finally {
-    btn.classList.remove("is-loading");
-    btn.disabled = false;
+    setAutoSaveIndicator("err");
+    showToast("Lỗi tự động lưu tài khoản lên GitHub", "err");
   }
 }
 
 async function savePresetsToGithub() {
   syncGhInputsToState();
-  if (!state.gh.owner || !state.gh.repo) {
-    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
-    openSettingsModal("github");
-    return;
-  }
+  if (!state.gh.owner || !state.gh.repo || !getToken()) return;
   if (!state.presets.length) {
     const ok = await showConfirm(
       "Danh sách mẫu chuyển tiền đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ mẫu đang có trên GitHub. Vẫn tiếp tục?",
@@ -580,31 +635,23 @@ async function savePresetsToGithub() {
     .map((p, i) => (!p.name || !p.name.trim() ? i + 1 : null))
     .filter((n) => n != null);
   if (emptyRows.length) {
-    showToast(`Mẫu ở dòng ${emptyRows.join(", ")} chưa có tên — điền hoặc xoá trước khi lưu.`, "err");
+    setAutoSaveIndicator("err", "Chưa lưu — thiếu dữ liệu");
     return;
   }
   const unresolvedRows = state.presets
     .map((p, i) => ((p.accountName || p.accountNum) && !findAccountForPreset(p) ? i + 1 : null))
     .filter((n) => n != null);
   if (unresolvedRows.length) {
-    showToast(`Mẫu ở dòng ${unresolvedRows.join(", ")} chưa chọn đúng tài khoản — mở tab "Mẫu chuyển tiền" để chọn lại.`, "err");
-    openSettingsModal("mau");
+    setAutoSaveIndicator("err", "Chưa lưu — mẫu chưa chọn đúng tài khoản");
     return;
   }
   const unresolvedTemplateRows = state.presets
     .map((p, i) => (p.template && !state.templates.some((t) => t.value === p.template) ? i + 1 : null))
     .filter((n) => n != null);
   if (unresolvedTemplateRows.length) {
-    showToast(`Mẫu ở dòng ${unresolvedTemplateRows.join(", ")} chưa chọn đúng mẫu hiển thị — mở tab "Mẫu chuyển tiền" để chọn lại.`, "err");
-    openSettingsModal("mau");
+    setAutoSaveIndicator("err", "Chưa lưu — mẫu chưa chọn đúng mẫu hiển thị");
     return;
   }
-  const btns = $$(".js-save-mau-btn");
-  btns.forEach((b) => {
-    b.classList.add("is-loading");
-    b.disabled = true;
-  });
-  setStatus($("#ghMsg"), "Đang lưu mẫu chuyển tiền lên GitHub…");
   try {
     state.sha.presets = await ghWriteJson(
       state.gh.pathPresets,
@@ -613,44 +660,24 @@ async function savePresetsToGithub() {
       `chore: cập nhật mau-chuyen-tien.json (${new Date().toISOString()})`
     );
     setStatus($("#ghMsg"), "Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
-    showToast("Đã lưu mẫu chuyển tiền lên GitHub ✓", "ok");
+    setAutoSaveIndicator("ok");
     clearDirty("presets");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    showToast("Lỗi khi lưu lên GitHub", "err");
-    openSettingsModal("github");
-  } finally {
-    btns.forEach((b) => {
-      b.classList.remove("is-loading");
-      b.disabled = false;
-    });
+    setAutoSaveIndicator("err");
+    showToast("Lỗi tự động lưu mẫu chuyển tiền lên GitHub", "err");
   }
 }
 
 async function saveContentToGithub() {
   syncGhInputsToState();
-  if (!state.gh.owner || !state.gh.repo) {
-    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
-    openSettingsModal("github");
-    return;
-  }
-  if (!state.content.length) {
-    const ok = await showConfirm(
-      "Danh sách nội dung chuyển khoản đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu đang có trên GitHub. Vẫn tiếp tục?",
-      "Vẫn lưu (xoá hết)"
-    );
-    if (!ok) return;
-  }
+  if (!state.gh.owner || !state.gh.repo || !getToken()) return;
   const emptyRows = state.content.map((c, i) => (!c || !c.trim() ? i + 1 : null)).filter((n) => n != null);
   if (emptyRows.length) {
-    showToast(`Dòng ${emptyRows.join(", ")} chưa có nội dung — điền hoặc xoá trước khi lưu.`, "err");
+    setAutoSaveIndicator("err", "Chưa lưu — có dòng trống");
     return;
   }
-  const btn = $("#btnSaveContentGithub");
-  btn.classList.add("is-loading");
-  btn.disabled = true;
-  setStatus($("#ghMsg"), "Đang lưu nội dung chuyển khoản lên GitHub…");
   try {
     state.sha.content = await ghWriteJson(
       state.gh.pathContent,
@@ -659,33 +686,19 @@ async function saveContentToGithub() {
       `chore: cập nhật noi-dung-chuyen-khoan.json (${new Date().toISOString()})`
     );
     setStatus($("#ghMsg"), "Đã lưu nội dung chuyển khoản lên GitHub ✓", "ok");
-    showToast("Đã lưu nội dung chuyển khoản lên GitHub ✓", "ok");
+    setAutoSaveIndicator("ok");
     clearDirty("content");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    showToast("Lỗi khi lưu lên GitHub", "err");
-    openSettingsModal("github");
-  } finally {
-    btn.classList.remove("is-loading");
-    btn.disabled = false;
+    setAutoSaveIndicator("err");
+    showToast("Lỗi tự động lưu nội dung chuyển khoản lên GitHub", "err");
   }
 }
 
 async function saveTemplatesToGithub() {
   syncGhInputsToState();
-  if (!state.gh.owner || !state.gh.repo) {
-    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
-    openSettingsModal("github");
-    return;
-  }
-  if (!state.templates.length) {
-    const ok = await showConfirm(
-      "Danh sách mẫu hiển thị QR đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu đang có trên GitHub. Vẫn tiếp tục?",
-      "Vẫn lưu (xoá hết)"
-    );
-    if (!ok) return;
-  }
+  if (!state.gh.owner || !state.gh.repo || !getToken()) return;
   const invalidRows = [];
   state.templates.forEach((t, i) => {
     const missing = [];
@@ -694,14 +707,9 @@ async function saveTemplatesToGithub() {
     if (missing.length) invalidRows.push({ row: i + 1, missing });
   });
   if (invalidRows.length) {
-    const detail = invalidRows.map((r) => `dòng ${r.row} (thiếu ${r.missing.join(", ")})`).join("; ");
-    showToast(`Chưa lưu được: ${detail}.`, "err");
+    setAutoSaveIndicator("err", "Chưa lưu — thiếu value/label");
     return;
   }
-  const btn = $("#btnSaveTemplatesGithub");
-  btn.classList.add("is-loading");
-  btn.disabled = true;
-  setStatus($("#ghMsg"), "Đang lưu mẫu hiển thị QR lên GitHub…");
   try {
     state.sha.templates = await ghWriteJson(
       state.gh.pathTemplates,
@@ -710,16 +718,13 @@ async function saveTemplatesToGithub() {
       `chore: cập nhật templates.json (${new Date().toISOString()})`
     );
     setStatus($("#ghMsg"), "Đã lưu mẫu hiển thị QR lên GitHub ✓", "ok");
-    showToast("Đã lưu mẫu hiển thị QR lên GitHub ✓", "ok");
+    setAutoSaveIndicator("ok");
     clearDirty("templates");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    showToast("Lỗi khi lưu lên GitHub", "err");
-    openSettingsModal("github");
-  } finally {
-    btn.classList.remove("is-loading");
-    btn.disabled = false;
+    setAutoSaveIndicator("err");
+    showToast("Lỗi tự động lưu mẫu hiển thị QR lên GitHub", "err");
   }
 }
 
@@ -998,7 +1003,7 @@ function loadAccountsCache() {
   const cached = localStorage.getItem(LS_ACCOUNTS_CACHE);
   if (cached) {
     try {
-      state.accounts = JSON.parse(cached);
+      state.accounts = normalizeAccountFields(JSON.parse(cached));
       return;
     } catch (e) {}
   }
@@ -1011,7 +1016,7 @@ async function loadAccountsInitial() {
   }
   try {
     const res = await fetch("data/my-accounts.json");
-    state.accounts = await res.json();
+    state.accounts = normalizeAccountFields(await res.json());
   } catch (e) {
     state.accounts = [];
   }
@@ -1175,6 +1180,7 @@ function renderTable() {
     acc.vietqr_link = buildAccountVietQrLink(acc);
     const hasLink = !!acc.vietqr_link;
     const tr = document.createElement("tr");
+    if (acc.hidden) tr.classList.add("row-hidden");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Tên gợi nhớ"><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}" title="${escapeAttr(acc.list_name)}"></td>
@@ -1189,9 +1195,10 @@ function renderTable() {
           ? `<a class="icon-btn" href="${escapeAttr(acc.vietqr_link)}" target="_blank" rel="noopener noreferrer" title="Mở link VietQR">🔗</a>
              <button class="icon-btn" type="button" title="Sao chép link VietQR" data-copy-link="${idx}">📋</button>`
           : `<button class="icon-btn" type="button" disabled title="Điền STK &amp; ngân hàng để có link VietQR">🔗</button>`}
+        <button class="icon-btn${acc.isDefault ? " is-default" : ""}" type="button" title="${acc.isDefault ? "Đang là tài khoản mặc định — bấm để bỏ" : "Đặt làm tài khoản mặc định"}" data-toggle-default="${idx}">${acc.isDefault ? "★" : "☆"}</button>
+        <button class="icon-btn${acc.hidden ? " is-hidden-on" : ""}" type="button" title="${acc.hidden ? "Đang ẩn khỏi danh sách chọn nhanh — bấm để hiện lại" : "Ẩn khỏi danh sách chọn nhanh (vẫn giữ dữ liệu)"}" data-toggle-hidden="${idx}">${acc.hidden ? "🚫" : "👁"}</button>
         <button class="icon-btn order-btn" title="Đưa lên trên" data-move="${idx}" data-dir="-1" ${!sortable || idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-move="${idx}" data-dir="1" ${!sortable || idx === state.accounts.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-confirm-row="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -1233,15 +1240,44 @@ function renderTable() {
       }
     });
   });
+  body.querySelectorAll("[data-toggle-default]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.toggleDefault);
+      const acc = state.accounts[idx];
+      if (!acc) return;
+      const turningOn = !acc.isDefault;
+      state.accounts.forEach((a) => {
+        a.isDefault = false;
+      });
+      if (turningOn) {
+        acc.isDefault = true;
+        acc.hidden = false; // tài khoản mặc định thì không thể ở trạng thái ẩn
+      }
+      markDirty("accounts");
+      renderTable();
+      populateQrAccounts();
+      showToast(turningOn ? `Đã đặt "${acc.list_name || acc.data_num}" làm mặc định` : "Đã bỏ tài khoản mặc định", "ok");
+    });
+  });
+  body.querySelectorAll("[data-toggle-hidden]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.toggleHidden);
+      const acc = state.accounts[idx];
+      if (!acc) return;
+      acc.hidden = !acc.hidden;
+      if (acc.hidden) acc.isDefault = false; // ẩn thì không thể là mặc định
+      markDirty("accounts");
+      renderTable();
+      populateQrAccounts();
+      showToast(acc.hidden ? `Đã ẩn "${acc.list_name || acc.data_num}" khỏi danh sách chọn nhanh` : `Đã hiện lại "${acc.list_name || acc.data_num}"`, "ok");
+    });
+  });
   body.querySelectorAll("[data-move]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const idx = Number(e.currentTarget.dataset.move);
       const dir = Number(e.currentTarget.dataset.dir);
       moveAccountRow(idx, dir);
     });
-  });
-  body.querySelectorAll("[data-confirm-row]").forEach((btn) => {
-    btn.addEventListener("click", () => saveAccountsToGithub());
   });
   body.querySelectorAll("[data-del]").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
@@ -1282,6 +1318,8 @@ async function addRow() {
     data__logo: defaultBank.logo || "",
     data__short_name: defaultBank.short_name || "",
     vietqr_link: "",
+    hidden: false,
+    isDefault: false,
   });
   renumberAccountsStt();
   markDirty("accounts");
@@ -1290,6 +1328,13 @@ async function addRow() {
 }
 
 // ---------- Mặc định: tài khoản + mẫu hiển thị QR ----------
+function normalizeAccountFields(list) {
+  (list || []).forEach((a) => {
+    if (a.hidden === undefined) a.hidden = false;
+    if (a.isDefault === undefined) a.isDefault = false;
+  });
+  return list;
+}
 function accountKey(acc) {
   return `${acc.list_name}|${acc.data_num}`;
 }
@@ -1329,8 +1374,14 @@ function loadDefaults() {
 }
 function applyDefaults() {
   const defaults = loadDefaults();
-  if (defaults.accountKey) {
-    const idx = state.accounts.findIndex((a) => accountKey(a) === defaults.accountKey);
+  const defIdx = state.accounts.findIndex((a) => a.isDefault && !a.hidden);
+  if (defIdx >= 0) {
+    $("#qrAccount").value = defIdx;
+  } else if (defaults.accountKey) {
+    // Tương thích ngược: nếu trình duyệt này còn lưu mặc định kiểu cũ (localStorage)
+    // từ trước khi có trường isDefault trong JSON, vẫn áp dụng tạm cho tới khi
+    // người dùng đặt lại mặc định mới (sẽ tự chuyển sang lưu trong JSON).
+    const idx = state.accounts.findIndex((a) => accountKey(a) === defaults.accountKey && !a.hidden);
     if (idx >= 0) $("#qrAccount").value = idx;
   }
   $("#qrTemplate").value = defaults.template || "compact2";
@@ -1339,10 +1390,14 @@ function setDefaultAccount() {
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
   if (!acc) return;
-  const defaults = loadDefaults();
-  defaults.accountKey = accountKey(acc);
-  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+  state.accounts.forEach((a) => {
+    a.isDefault = false;
+  });
+  acc.isDefault = true;
+  markDirty("accounts");
+  renderTable();
   flashLinkBtn("#btnSetDefaultAccount", "★ ");
+  showToast(`Đã đặt "${acc.list_name || acc.data_num}" làm tài khoản mặc định`, "ok");
 }
 function isDefaultContent(content) {
   const defaults = loadDefaults();
@@ -1479,7 +1534,7 @@ function mauAccountOptionsHtml(selectedIdx) {
   html += state.accounts
     .map((a, i) => {
       const bank = a.data__shortName || a.data__name || a.data__code || "?";
-      const label = `${a.list_name || "(chưa đặt tên)"} — ${a.data_num || "?"} (${bank})`;
+      const label = `${a.list_name || "(chưa đặt tên)"} — ${a.data_num || "?"} (${bank})${a.hidden ? " (Đã ẩn)" : ""}`;
       return `<option value="${i}" ${i === selectedIdx ? "selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
@@ -1525,7 +1580,6 @@ function renderMauTable() {
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-mau-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-mau-move="${idx}" data-dir="1" ${idx === state.presets.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-mau-tbl-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-mau-tbl-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -1575,9 +1629,6 @@ function renderMauTable() {
       const dir = Number(e.currentTarget.dataset.dir);
       movePresetRow(idx, dir);
     });
-  });
-  body.querySelectorAll("[data-mau-tbl-confirm]").forEach((btn) => {
-    btn.addEventListener("click", () => savePresetsToGithub());
   });
   body.querySelectorAll("[data-mau-tbl-del]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1803,9 +1854,11 @@ function populateQrAccounts() {
   const sel = $("#qrAccount");
   const prev = sel.value;
   sel.innerHTML = state.accounts
-    .map((a, i) => `<option value="${i}">${escapeHtml(a.list_name)} — ${escapeHtml(a.data_num)} (${escapeHtml(a.data__code)})</option>`)
+    .map((a, i) => ({ a, i }))
+    .filter(({ a }) => !a.hidden)
+    .map(({ a, i }) => `<option value="${i}">${escapeHtml(a.list_name)} — ${escapeHtml(a.data_num)} (${escapeHtml(a.data__code)})</option>`)
     .join("");
-  if (prev && Number(prev) < state.accounts.length) {
+  if (prev && state.accounts[Number(prev)] && !state.accounts[Number(prev)].hidden) {
     sel.value = prev;
   } else {
     applyDefaults();
@@ -2164,6 +2217,8 @@ function saveAdhocAsAccount() {
     data__shortName: adhocBank.shortName || "",
     data__logo: adhocBank.logo || "",
     data__short_name: adhocBank.short_name || "",
+    hidden: false,
+    isDefault: false,
   });
   renumberAccountsStt();
   markDirty("accounts");
@@ -2233,7 +2288,6 @@ function renderContentTable() {
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-content-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-content-move="${idx}" data-dir="1" ${idx === state.content.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-content-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-content-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -2256,9 +2310,6 @@ function renderContentTable() {
       const dir = Number(e.currentTarget.dataset.dir);
       moveContentRow(idx, dir);
     });
-  });
-  body.querySelectorAll("[data-content-confirm]").forEach((btn) => {
-    btn.addEventListener("click", () => saveContentToGithub());
   });
   body.querySelectorAll("[data-content-del]").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
@@ -2309,7 +2360,6 @@ function renderAmountsTable() {
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-amount-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-amount-move="${idx}" data-dir="1" ${idx === state.amounts.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-amount-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-amount-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -2334,9 +2384,6 @@ function renderAmountsTable() {
       const dir = Number(e.currentTarget.dataset.dir);
       moveAmountRow(idx, dir);
     });
-  });
-  body.querySelectorAll("[data-amount-confirm]").forEach((btn) => {
-    btn.addEventListener("click", () => saveAmountsToGithub());
   });
   body.querySelectorAll("[data-amount-del]").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
@@ -2375,27 +2422,12 @@ function addAmountRow() {
 }
 async function saveAmountsToGithub() {
   syncGhInputsToState();
-  if (!state.gh.owner || !state.gh.repo) {
-    setStatus($("#ghMsg"), "Chưa cấu hình GitHub — mở tab Kết nối GitHub.", "err");
-    openSettingsModal("github");
-    return;
-  }
-  if (!state.amounts.length) {
-    const ok = await showConfirm(
-      "Danh sách số tiền gợi ý đang trống — lưu lúc này sẽ XOÁ TOÀN BỘ dữ liệu đang có trên GitHub. Vẫn tiếp tục?",
-      "Vẫn lưu (xoá hết)"
-    );
-    if (!ok) return;
-  }
+  if (!state.gh.owner || !state.gh.repo || !getToken()) return;
   const invalidRows = state.amounts.map((a, i) => (Number(a) > 0 ? null : i + 1)).filter((n) => n != null);
   if (invalidRows.length) {
-    showToast(`Dòng ${invalidRows.join(", ")} chưa hợp lệ — điền số tiền lớn hơn 0.`, "err");
+    setAutoSaveIndicator("err", "Chưa lưu — số tiền không hợp lệ");
     return;
   }
-  const btn = $("#btnSaveAmountsGithub");
-  btn.classList.add("is-loading");
-  btn.disabled = true;
-  setStatus($("#ghMsg"), "Đang lưu số tiền gợi ý lên GitHub…");
   try {
     state.sha.amounts = await ghWriteJson(
       state.gh.pathAmounts,
@@ -2404,16 +2436,13 @@ async function saveAmountsToGithub() {
       `chore: cập nhật so-tien-goi-y.json (${new Date().toISOString()})`
     );
     setStatus($("#ghMsg"), "Đã lưu số tiền gợi ý lên GitHub ✓", "ok");
-    showToast("Đã lưu số tiền gợi ý lên GitHub ✓", "ok");
+    setAutoSaveIndicator("ok");
     clearDirty("amounts");
   } catch (err) {
     console.error(err);
     setStatus($("#ghMsg"), "Lỗi khi lưu: " + err.message, "err");
-    showToast("Lỗi khi lưu lên GitHub", "err");
-    openSettingsModal("github");
-  } finally {
-    btn.classList.remove("is-loading");
-    btn.disabled = false;
+    setAutoSaveIndicator("err");
+    showToast("Lỗi tự động lưu số tiền gợi ý lên GitHub", "err");
   }
 }
 
@@ -2459,7 +2488,6 @@ function renderTemplatesTable() {
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-tpl-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-tpl-move="${idx}" data-dir="1" ${idx === state.templates.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn row-confirm-btn" title="Xác nhận & lưu lên GitHub" data-tpl-confirm="${idx}">✓</button>
         <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
       </td>`;
     body.appendChild(tr);
@@ -2483,9 +2511,6 @@ function renderTemplatesTable() {
       const dir = Number(e.currentTarget.dataset.dir);
       moveTemplateRow(idx, dir);
     });
-  });
-  body.querySelectorAll("[data-tpl-confirm]").forEach((btn) => {
-    btn.addEventListener("click", () => saveTemplatesToGithub());
   });
   body.querySelectorAll("[data-tpl-del]").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
@@ -2537,6 +2562,9 @@ function switchWorkspaceTab(tabName) {
 // nên chuyển tab chỉ cần ẩn/hiện panel — không cần animate chiều cao bằng JS nữa
 // (cách cũ hay bị nhảy/co rồi mất nội dung khi chuyển tab nhanh).
 function switchSettingsTab(tabName) {
+  if (SETTINGS_GATED_TABS.includes(tabName) && !state.gh.authenticated) {
+    tabName = "github";
+  }
   $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
 
   $("#settingsTabAccounts").hidden = tabName !== "accounts";
@@ -2556,34 +2584,30 @@ function switchSettingsTab(tabName) {
 }
 function openSettingsModal(tabName) {
   $("#settingsBackdrop").hidden = false;
-  switchSettingsTab(tabName || "accounts");
+  const target = state.gh.authenticated ? tabName || "accounts" : "github";
+  switchSettingsTab(target);
 }
 
-// ---------- Khoá form quản lý dữ liệu khi trình duyệt CHƯA nhập token GitHub ----------
-// Yêu cầu: chỉ trình duyệt đã lưu Personal Access Token mới được xem/sửa các
-// bảng dữ liệu (tài khoản, nội dung, số tiền gợi ý, mẫu hiển thị, mẫu chuyển tiền)
-// trong Cài đặt — tránh lộ/sửa nhầm dữ liệu trên máy chưa xác thực.
-const SETTINGS_GATED_PANEL_IDS = ["settingsTabAccounts", "settingsTabContent", "settingsTabAmounts", "settingsTabTemplates", "settingsTabMau"];
-function hasGhTokenSaved() {
-  return !!getToken();
-}
+// ---------- Ẩn các tab dữ liệu khi trình duyệt CHƯA xác thực token GitHub ----------
+// Yêu cầu: chỉ khi đã xác thực thành công (token có quyền ghi vào repo) mới cho
+// xem/sửa các bảng dữ liệu (tài khoản, nội dung, số tiền gợi ý, mẫu hiển thị,
+// mẫu chuyển tiền, ngân hàng VietQR) — trước đó chỉ hiện đúng 1 tab "GitHub" để
+// người dùng nhập owner/repo/token.
+const SETTINGS_GATED_TABS = ["accounts", "content", "amounts", "templates", "mau", "vietqr"];
 function applySettingsLock() {
-  const locked = !hasGhTokenSaved();
-  SETTINGS_GATED_PANEL_IDS.forEach((id) => {
-    const panel = document.getElementById(id);
-    if (!panel) return;
-    let hint = panel.querySelector(".settings-lock-hint");
-    if (!hint) {
-      hint = document.createElement("p");
-      hint.className = "settings-lock-hint";
-      hint.innerHTML = "🔒 Nhập <strong>Personal Access Token GitHub</strong> ở tab <strong>GitHub</strong> rồi bấm \"Lưu thông tin kết nối\" để xem và chỉnh sửa dữ liệu này.";
-      panel.prepend(hint);
-    }
-    hint.hidden = !locked;
-    panel.querySelectorAll(".panel-head, .table-wrap").forEach((el) => {
-      el.style.display = locked ? "none" : "";
-    });
+  const unlocked = !!state.gh.authenticated;
+  SETTINGS_GATED_TABS.forEach((tabName) => {
+    const tabBtn = document.querySelector(`.settings-tabs .tab[data-settings-tab="${tabName}"]`);
+    if (tabBtn) tabBtn.hidden = !unlocked;
   });
+  // Nếu đang khoá mà tab đang mở không phải "GitHub" (vd. vừa xoá token khi đang
+  // đứng ở tab khác), tự chuyển về tab "GitHub" — chỉ khi cửa sổ cài đặt đang mở.
+  if (!unlocked && !$("#settingsBackdrop").hidden) {
+    const activeTab = document.querySelector(".settings-tabs .tab.active");
+    if (activeTab && activeTab.dataset.settingsTab !== "github") {
+      switchSettingsTab("github");
+    }
+  }
 }
 function closeSettingsModal() {
   $("#settingsBackdrop").hidden = true;
@@ -2737,7 +2761,6 @@ async function init() {
     btn.textContent = showing ? "👁" : "🙈";
   });
   $("#btnGhSave").addEventListener("click", saveGhConfigToStorage);
-  $("#btnGhLoad").addEventListener("click", loadAllFromGithub);
   $("#btnGhCheck").addEventListener("click", checkGhConnection);
   $("#btnGhForget").addEventListener("click", () => {
     localStorage.removeItem(LS_GH_TOKEN);
@@ -2750,36 +2773,12 @@ async function init() {
 
   $("#btnAddRow").addEventListener("click", addRow);
   $("#btnRefreshBanks").addEventListener("click", refreshRefBanksFromVietQR);
-  $("#btnSaveGithub").addEventListener("click", async () => {
-    localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts));
-    await saveAccountsToGithub();
-  });
-  $("#btnSaveMauGithub").addEventListener("click", async () => {
-    savePresetsCache();
-    await savePresetsToGithub();
-  });
   $("#btnAddMauRow").addEventListener("click", addMauRow);
-  $("#btnSaveMauSettingsGithub").addEventListener("click", async () => {
-    savePresetsCache();
-    await savePresetsToGithub();
-  });
   $("#btnRefreshBanksVietqrTab").addEventListener("click", refreshVietqrBanksTab);
   $("#vietqrBankSearch").addEventListener("input", (e) => renderVietqrBanksTable(e.target.value));
   $("#btnAddContentRow").addEventListener("click", addContentRow);
-  $("#btnSaveContentGithub").addEventListener("click", async () => {
-    saveContentCache();
-    await saveContentToGithub();
-  });
   $("#btnAddTemplateRow").addEventListener("click", addTemplateRow);
-  $("#btnSaveTemplatesGithub").addEventListener("click", async () => {
-    saveTemplatesCache();
-    await saveTemplatesToGithub();
-  });
   $("#btnAddAmountRow").addEventListener("click", addAmountRow);
-  $("#btnSaveAmountsGithub").addEventListener("click", async () => {
-    saveAmountsCache();
-    await saveAmountsToGithub();
-  });
   $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
   $("#btnSaveAsPreset").addEventListener("click", saveCurrentFormAsPreset);
 
@@ -2945,6 +2944,9 @@ async function init() {
   switchWorkspaceTab("qr");
   onGenerateQr(null, { silent: true });
 
+  // Tự kiểm tra lại quyền ghi GitHub (im lặng, không hiện thông báo) mỗi khi mở
+  // trang — nếu vẫn hợp lệ, các tab dữ liệu sẽ tự mở khoá mà không cần bấm gì.
+  checkGhConnection({ silent: true });
   syncFromGithubSilently();
 }
 
