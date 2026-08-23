@@ -1,11 +1,11 @@
 [
   {
-    "value": "compact2",
-    "label": "Compact 2"
-  },
-  {
     "value": "compact",
     "label": "Compact"
+  },
+  {
+    "value": "compact2",
+    "label": "Compact 2"
   },
   {
     "value": "print",
