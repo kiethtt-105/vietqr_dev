@@ -1421,6 +1421,16 @@ function setDefaultAccount() {
   flashLinkBtn("#btnSetDefaultAccount", "★ ");
   showToast(`Đã đặt "${acc.list_name || acc.data_num}" làm tài khoản mặc định`, "ok");
 }
+function setDefaultTemplate() {
+  const value = $("#qrTemplate").value;
+  if (!value) return;
+  const defaults = loadDefaults();
+  defaults.template = value;
+  localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+  flashLinkBtn("#btnSetDefaultTemplate", "★ ");
+  const tpl = state.templates.find((t) => t.value === value);
+  showToast(`Đã đặt "${tpl ? tpl.label : value}" làm mẫu hiển thị mặc định`, "ok");
+}
 function isDefaultContent(content) {
   const defaults = loadDefaults();
   return !!(defaults.contentDefault && defaults.contentDefault === content);
@@ -1441,13 +1451,6 @@ function applyDefaultContentIfNeeded() {
   const defaults = loadDefaults();
   if (!defaults.contentDefault) return;
   if ($("#qrContent").value.trim()) return;
-  // Nếu người dùng vừa chủ động bấm "Xoá thông tin" (form state có đánh dấu
-  // skipDefaultContent) thì KHÔNG tự điền lại nội dung mặc định — tránh tình
-  // trạng xoá xong F5 lại thấy nội dung "sống lại". Cờ này chỉ có hiệu lực
-  // 1 lần: hễ người dùng gõ gì mới thì lần lưu form state kế tiếp sẽ không
-  // còn cờ này nữa, nội dung mặc định sẽ hoạt động bình thường trở lại.
-  const formState = loadFormStateRaw();
-  if (formState && formState.skipDefaultContent) return;
   $("#qrContent").value = defaults.contentDefault;
   updateContentCounter(defaults.contentDefault.trim());
 }
@@ -2055,11 +2058,9 @@ function toggleContentSuggestions() {
 }
 
 // Nút "Xoá thông tin" — trả form về trạng thái trống: xoá số tiền/nội dung
-// đang nhập, bỏ chọn mẫu đang gắn (nếu có). Thay vì XOÁ HẲN form state đã
-// lưu, ta LƯU LẠI trạng thái trống này kèm cờ skipDefaultContent — để F5
-// sau đó vẫn giữ nguyên form trống (không bị "nội dung mặc định" tự điền
-// lại, xem applyDefaultContentIfNeeded()). Cờ này tự hết hiệu lực ngay khi
-// người dùng gõ gì mới, vì lần saveFormState() kế tiếp không còn cờ đó nữa.
+// đang nhập, bỏ chọn mẫu đang gắn (nếu có). Không cần lưu trạng thái này lại
+// để khôi phục sau F5 nữa — trang giờ luôn mở lên ở trạng thái mặc định
+// (tài khoản & mẫu hiển thị mặc định, số tiền/nội dung trống) mỗi lần tải lại.
 function clearQrForm() {
   $("#qrAmount").value = "";
   $("#qrContent").value = "";
@@ -2067,19 +2068,6 @@ function clearQrForm() {
   updateContentCounter("");
   validateAmount("");
   clearActivePreset({ silent: true });
-  try {
-    localStorage.setItem(
-      LS_FORM_STATE,
-      JSON.stringify({
-        accountIdx: Number($("#qrAccount").value) || 0,
-        amount: "",
-        content: "",
-        template: $("#qrTemplate").value,
-        selectedPresetIdx: null,
-        skipDefaultContent: true,
-      })
-    );
-  } catch (e) {}
   $("#qrCard").hidden = true;
   $("#qrEmpty").hidden = false;
   $("#qrActions").hidden = true;
@@ -2849,6 +2837,7 @@ async function init() {
   });
 
   $("#btnSetDefaultAccount").addEventListener("click", setDefaultAccount);
+  $("#btnSetDefaultTemplate").addEventListener("click", setDefaultTemplate);
   $("#btnClearActivePreset").addEventListener("click", clearActivePreset);
 
   $("#qrAmount").addEventListener("input", () => {
@@ -2936,13 +2925,11 @@ async function init() {
 
   updateContentCounter($("#qrContent").value.trim());
   applyDefaults();
-  restoreFormState();
-  // Luôn gọi hàm dưới đây (không chỉ khi chưa có form state đã lưu) vì
-  // applyDefaultContentIfNeeded() tự kiểm tra "đã có nội dung được nhập
-  // chưa" trước khi áp dụng mặc định — nếu chỉ gọi lúc chưa từng lưu form
-  // thì nội dung mặc định do người dùng đặt SAU khi đã dùng app sẽ không
-  // bao giờ được áp dụng lại nữa (vì form state luôn tồn tại sau lần dùng
-  // đầu tiên).
+  // KHÔNG khôi phục lại số tiền/nội dung/mẫu đã chọn của lần dùng trước — mỗi
+  // khi mở lại trang (F5) form luôn bắt đầu từ tài khoản & mẫu hiển thị MẶC
+  // ĐỊNH (đặt bằng nút ☆ ở trên), số tiền và nội dung để trống. Nội dung mặc
+  // định (nếu có đặt riêng, xem setDefaultContent()) vẫn được tự điền vào ô
+  // trống ở applyDefaultContentIfNeeded() bên dưới.
   applyDefaultContentIfNeeded();
   updateContentCounter($("#qrContent").value.trim());
   updateMauActiveUi();

@@ -126,7 +126,7 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,.bank-picker-popup,
   transition:background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease;
 }
 
-.app{max-width:1080px;margin:0 auto;min-height:100vh;background:transparent;padding:18px 18px 0;}
+.app{max-width:min(1600px, 96vw);margin:0 auto;min-height:100vh;background:transparent;padding:18px 18px 0;}
 
 .topbar{
   display:flex;align-items:center;justify-content:space-between;gap:14px;
