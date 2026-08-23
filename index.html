@@ -4,15 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR Generator</title>
-<script>
-(function(){
-  try{
-    var saved=localStorage.getItem("vietqr_theme_v2");
-    var theme=saved||"light";
-    document.documentElement.setAttribute("data-theme",theme);
-  }catch(e){}
-})();
-</script>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io https://cdn.vietqr.io https://vietqr.net; connect-src 'self' https://api.github.com https://api.vietqr.io https://img.vietqr.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -50,7 +41,6 @@
         </div>
       </div>
       <div class="topbar-control-group">
-        <button class="btn ghost icon-only" id="btnToggleTheme" type="button" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối">🌙</button>
         <button class="btn ghost icon-only" id="btnOpenSettings" type="button" title="Cài đặt" aria-label="Cài đặt">⚙</button>
       </div>
     </div>
@@ -77,16 +67,19 @@
 
       <nav class="settings-tabs" aria-label="Danh mục cài đặt">
         <div class="settings-tabs-group">
-          <span class="settings-tabs-group-label">Thêm &amp; quản lý</span>
+          <span class="settings-tabs-group-label">Dữ liệu của bạn</span>
           <button class="tab active" type="button" data-settings-tab="accounts">Tài khoản</button>
-          <button class="tab" type="button" data-settings-tab="content">Nội dung</button>
-          <button class="tab" type="button" data-settings-tab="amounts">Số tiền gợi ý</button>
-          <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
           <button class="tab" type="button" data-settings-tab="mau">Mẫu chuyển tiền</button>
-          <button class="tab" type="button" data-settings-tab="vietqr">VietQR</button>
+          <button class="tab" type="button" data-settings-tab="content">Nội dung gợi ý</button>
+          <button class="tab" type="button" data-settings-tab="amounts">Số tiền gợi ý</button>
         </div>
         <div class="settings-tabs-group">
-          <span class="settings-tabs-group-label">Kết nối</span>
+          <span class="settings-tabs-group-label">Cấu hình hiển thị</span>
+          <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
+          <button class="tab" type="button" data-settings-tab="vietqr">Ngân hàng (VietQR)</button>
+        </div>
+        <div class="settings-tabs-group">
+          <span class="settings-tabs-group-label">Kết nối &amp; lưu trữ (JSON)</span>
           <button class="tab" type="button" data-settings-tab="github">GitHub</button>
         </div>
       </nav>

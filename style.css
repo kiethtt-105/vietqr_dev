@@ -6,51 +6,7 @@
    (a nod to the security-thread foil on real banknotes).
    ========================================================= */
 
-:root,
-[data-theme="light"]{
-  --bg:#EEF1F8;
-  --bg-2:#E3E8F5;
-  --panel:rgba(255,255,255,.74);
-  --panel-2:rgba(255,255,255,.55);
-  --border:rgba(23,31,64,.12);
-  --border-strong:rgba(23,31,64,.22);
-
-  --ink:#111726;
-  --ink-dim:#4E5A75;
-  --ink-faint:#838FA8;
-
-  --accent:#0BA880;
-  --accent-bright:#0DCB9B;
-  --accent-dark:#087A5D;
-  --accent-wash:rgba(11,168,128,.13);
-
-  --violet:#5B4BDE;
-  --violet-bright:#6E5CF2;
-  --violet-wash:rgba(91,75,222,.12);
-
-  --gold:#BD7E17;
-  --gold-bright:#DA9B2A;
-  --gold-wash:rgba(189,126,23,.14);
-
-  --ok:#0BA880;
-  --danger:#D2445C;
-
-  --glow-1:rgba(11,168,128,.16);
-  --glow-2:rgba(91,75,222,.14);
-  --glow-3:rgba(189,126,23,.12);
-
-  --glass-blur:18px;
-  --panel-shadow:0 1px 1px rgba(23,31,64,.03), 0 12px 30px -18px rgba(23,31,64,.20);
-  --card-glow:0 24px 60px -20px rgba(23,31,64,.28), 0 0 0 1px rgba(23,31,64,.05), 0 0 70px -24px var(--glow-1);
-
-  --body:'Inter',sans-serif;
-  --display:'Space Grotesk',sans-serif;
-  --mono:'JetBrains Mono',monospace;
-  --radius:18px;
-  --radius-sm:11px;
-}
-
-[data-theme="dark"]{
+:root{
   --bg:#080B14;
   --bg-2:#0B0F1C;
   --panel:rgba(255,255,255,.045);
@@ -85,6 +41,12 @@
   --glass-blur:20px;
   --panel-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 16px 40px -18px rgba(0,0,0,.65);
   --card-glow:0 30px 70px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.06) inset, 0 0 90px -20px var(--glow-1);
+
+  --body:'Inter',sans-serif;
+  --display:'Space Grotesk',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --radius:18px;
+  --radius-sm:11px;
 }
 
 *{box-sizing:border-box;}
@@ -124,7 +86,6 @@ body{
   opacity:.35;
   mix-blend-mode:overlay;
 }
-[data-theme="light"] .bg-aurora::after{opacity:.5;mix-blend-mode:multiply;}
 .bg-blob{
   position:absolute;border-radius:50%;filter:blur(70px);
   will-change:transform;
@@ -230,7 +191,7 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,.bank-picker-popup,
   color:#04140F;border-color:transparent;font-weight:700;
   box-shadow:0 10px 24px -10px var(--glow-1);
 }
-[data-theme="dark"] .btn.primary{color:#051510;}
+.btn.primary{color:#051510;}
 .btn.primary:hover{filter:brightness(1.08);box-shadow:0 14px 32px -10px var(--glow-1), 0 0 0 1px rgba(255,255,255,.08) inset;}
 .btn.danger{background:var(--danger);color:#fff;border-color:var(--danger);}
 .btn.danger:hover{background:#B93A3A;border-color:#B93A3A;}
@@ -290,7 +251,7 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,.bank-picker-popup,
   -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(140%);
 }
 .gh-panel.settings-panel{
-  max-width:920px;
+  max-width:1040px;
   height:min(640px, 88vh);
   max-height:88vh;
   display:grid;
@@ -416,7 +377,7 @@ input::placeholder{color:var(--ink-faint);}
   background:linear-gradient(120deg, var(--accent), var(--violet));
   box-shadow:0 6px 16px -6px var(--glow-1);
 }
-[data-theme="dark"] .tab.active{color:#051510;}
+.tab.active{color:#051510;}
 
 .workspace-tabs{max-width:360px;}
 
@@ -454,6 +415,27 @@ input::placeholder{color:var(--ink-faint);}
 
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
+/* Đảm bảo các cột dữ liệu (tên gợi nhớ, số TK, chủ TK, nội dung...) luôn có đủ chỗ
+   hiển thị và không bị co lại/cắt chữ (...). Khi nội dung dài hơn khung modal,
+   .table-wrap tự cuộn ngang thay vì ép chữ — di chuột vào ô vẫn xem được đầy đủ
+   qua tooltip (title) đã gắn sẵn ở app.js. */
+#bankTable{min-width:960px;}
+#bankTable th:nth-child(2), #bankTable td:nth-child(2){min-width:200px;}
+#bankTable th:nth-child(3), #bankTable td:nth-child(3){min-width:170px;}
+#bankTable th:nth-child(4), #bankTable td:nth-child(4){min-width:210px;}
+
+#mauTable{min-width:950px;}
+#mauTable th:nth-child(2), #mauTable td:nth-child(2){min-width:190px;}
+#mauTable th:nth-child(3), #mauTable td:nth-child(3){min-width:220px;}
+#mauTable th:nth-child(5), #mauTable td:nth-child(5){min-width:230px;}
+
+#vietqrBanksTable{min-width:980px;}
+#vietqrBanksTable th:nth-child(3), #vietqrBanksTable td:nth-child(3){min-width:180px;}
+#vietqrBanksTable th:nth-child(4), #vietqrBanksTable td:nth-child(4){min-width:260px;}
+
+#templatesTable{min-width:520px;}
+#templatesTable th:nth-child(2), #templatesTable td:nth-child(2){min-width:160px;}
+#templatesTable th:nth-child(3), #templatesTable td:nth-child(3){min-width:200px;}
 thead th{
   text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;
   color:var(--ink-faint);background:var(--panel-2);font-weight:700;

@@ -8,7 +8,6 @@ const LS_AMOUNTS_CACHE = "vietqr_amounts_cache";
 const LS_DEFAULTS = "vietqr_defaults";
 const LS_FORM_STATE = "vietqr_form_state";
 const LS_REFBANKS_CACHE = "vietqr_refbanks_cache";
-const LS_THEME = "vietqr_theme_v2";
 const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000;
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
@@ -215,6 +214,17 @@ const AUTO_SAVE_FN_BY_KEY = {
   templates: () => saveTemplatesToGithub(),
   amounts: () => saveAmountsToGithub(),
 };
+// Lưu cache cục bộ (localStorage) ngay lập tức khi dữ liệu bị sửa — độc lập
+// hoàn toàn với việc auto-save lên GitHub (việc đó cần kết nối + có thể thất
+// bại/chậm). Đây là lớp bảo vệ để F5/đóng trình duyệt không làm mất dữ liệu
+// vừa sửa khi chưa kịp/chưa thể đồng bộ lên GitHub.
+const LOCAL_CACHE_SAVERS = {
+  accounts: () => localStorage.setItem(LS_ACCOUNTS_CACHE, JSON.stringify(state.accounts)),
+  presets: () => savePresetsCache(),
+  content: () => saveContentCache(),
+  templates: () => saveTemplatesCache(),
+  amounts: () => saveAmountsCache(),
+};
 const _autoSaveDebounced = {};
 let _autoSaveInFlight = 0;
 
@@ -263,6 +273,18 @@ function markDirty(key) {
   if (!(key in state.dirty)) return;
   state.dirty[key] = true;
   updateDirtyIndicators();
+  // Luôn ghi ngay vào localStorage của trình duyệt này bất kể GitHub đã kết
+  // nối hay chưa / có lưu lên GitHub thành công hay không — tránh tình trạng
+  // sửa dữ liệu xong bấm F5 là mất hết, quay về mặc định (trước đây chỉ có
+  // "presets/content/templates/amounts" tự lưu cache cục bộ ngay, riêng
+  // "accounts" phải chờ auto-save lên GitHub mới ghi cache → nếu chưa kết nối
+  // GitHub thì sửa xong không có gì được lưu lại cả).
+  const persistLocal = LOCAL_CACHE_SAVERS[key];
+  if (persistLocal) {
+    try {
+      persistLocal();
+    } catch (e) {}
+  }
   scheduleAutoSave(key);
 }
 function clearDirty(key) {
@@ -1540,6 +1562,12 @@ function mauAccountOptionsHtml(selectedIdx) {
     .join("");
   return html;
 }
+function mauAccountSelectedLabel(selectedIdx) {
+  const a = state.accounts[selectedIdx];
+  if (!a) return "— Chọn tài khoản —";
+  const bank = a.data__shortName || a.data__name || a.data__code || "?";
+  return `${a.list_name || "(chưa đặt tên)"} — ${a.data_num || "?"} (${bank})${a.hidden ? " (Đã ẩn)" : ""}`;
+}
 function mauTemplateOptionsHtml(selectedValue) {
   const known = state.templates.some((t) => t.value === selectedValue);
   let html = !selectedValue || !known ? `<option value="" ${!selectedValue ? "selected" : ""}>— Chọn mẫu hiển thị —</option>` : "";
@@ -1566,7 +1594,7 @@ function renderMauTable() {
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Tên mẫu"><input data-mau-idx="${idx}" data-mau-field="name" value="${escapeAttr(p.name || "")}" title="${escapeAttr(p.name || "")}"></td>
       <td data-label="Tài khoản">
-        <select data-mau-idx="${idx}" data-mau-field="accountSelect" class="${unresolved ? "input-err" : ""}" title="${unresolved ? "Không khớp tài khoản nào đã lưu — chọn lại" : ""}">
+        <select data-mau-idx="${idx}" data-mau-field="accountSelect" class="${unresolved ? "input-err" : ""}" title="${unresolved ? "Không khớp tài khoản nào đã lưu — chọn lại" : escapeAttr(mauAccountSelectedLabel(accIdx))}">
           ${mauAccountOptionsHtml(accIdx)}
         </select>
       </td>
@@ -2613,28 +2641,6 @@ function closeSettingsModal() {
   $("#settingsBackdrop").hidden = true;
 }
 
-// ---------- Ripple effect (hiệu ứng khi bấm chuột) ----------
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  try {
-    localStorage.setItem(LS_THEME, theme);
-  } catch (e) {}
-  const btn = $("#btnToggleTheme");
-  if (btn) {
-    btn.textContent = theme === "light" ? "☀" : "🌙";
-    btn.title = theme === "light" ? "Chuyển sang giao diện tối" : "Chuyển sang giao diện sáng";
-  }
-}
-
-function initTheme() {
-  const current = document.documentElement.getAttribute("data-theme") || "dark";
-  applyTheme(current);
-  $("#btnToggleTheme").addEventListener("click", () => {
-    const now = document.documentElement.getAttribute("data-theme") || "dark";
-    applyTheme(now === "light" ? "dark" : "light");
-  });
-}
-
 function initRippleEffect() {
   document.addEventListener("click", (e) => {
     const target = e.target.closest(".btn, .icon-btn, .chip, .tab, .mau-card-body");
@@ -2672,7 +2678,6 @@ async function clearEnteredInfo() {
 
 async function init() {
   loadGhConfigFromStorage();
-  initTheme();
   initRippleEffect();
 
   await loadRefBanks();
