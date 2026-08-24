@@ -2349,7 +2349,6 @@ function renderContentTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Nội dung gợi ý"><input data-content-idx="${idx}" value="${escapeAttr(text)}" title="${escapeAttr(text)}"></td>
       <td class="row-actions">
         <button class="icon-btn order-btn" title="Đưa lên trên" data-content-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-content-move="${idx}" data-dir="1" ${idx === state.content.length - 1 ? "disabled" : ""}>▼</button>
