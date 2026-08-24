@@ -804,6 +804,7 @@ tr.row-hidden:hover{opacity:.85;}
 }
 .toast-action:hover{text-decoration:underline;}
 .toast.ok{border-left-color:var(--ok);}
+.toast.warn{border-left-color:var(--gold);}
 .toast.err{border-left-color:var(--danger);}
 .toast.leaving{animation:toast-out .18s ease forwards;}
 @keyframes toast-in{from{opacity:0;transform:translateX(24px);} to{opacity:1;transform:translateX(0);}}

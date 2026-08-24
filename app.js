@@ -11,7 +11,7 @@ const LS_REFBANKS_CACHE = "vietqr_refbanks_cache";
 const REFBANKS_TTL_MS = 12 * 60 * 60 * 1000;
 
 const VIETQR_BANKS_API = "https://api.vietqr.io/v2/banks";
-const ADDINFO_SOFT_LIMIT = 25;
+const ADDINFO_SOFT_LIMIT = 90;
 const AMOUNT_WARN_THRESHOLD = 500_000_000;
 
 // Giá trị mặc định khi chưa có data/templates.json và chưa từng lưu gì (dùng làm fallback).
@@ -1502,11 +1502,18 @@ function restoreFormState() {
 
 function populateQrTemplateOptions() {
   const optionsHtml = state.templates.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
+  const defaultTemplate = loadDefaults().template || "compact2";
   [$("#qrTemplate"), $("#adhocTemplate")].forEach((sel) => {
     if (!sel) return;
     const prev = sel.value;
     sel.innerHTML = optionsHtml;
-    if (prev) sel.value = prev;
+    if (prev) {
+      sel.value = prev;
+    } else {
+      // Chưa từng chọn gì ở select này (lần đầu render) — áp mẫu mặc định
+      // luôn, thay vì để trình duyệt tự chọn option đầu tiên trong danh sách.
+      sel.value = defaultTemplate;
+    }
     updateCustomSelectTriggerLabel(sel);
   });
 }
@@ -2074,6 +2081,16 @@ function clearQrForm() {
   $("#qrContent").focus();
   showToast("Đã xoá thông tin đang nhập", "ok");
 }
+// ---------- Ảnh QR dự phòng cục bộ (khi img.vietqr.io bị nghẽn/gián đoạn) ----------
+// Nếu ảnh QR động từ img.vietqr.io tải lỗi, thử tải ảnh QR TĨNH đã lưu sẵn
+// trong thư mục qr-fallback/ (người dùng tự tạo lúc API còn chạy tốt rồi
+// upload lên, xem qr-fallback/README.md), đặt tên theo "MãNgânHàng-SốTK.png".
+// Ảnh dự phòng là ảnh tĩnh nên có thể không khớp đúng số tiền/nội dung vừa
+// nhập — báo rõ cho người dùng biết bằng toast màu vàng khi phải dùng tới nó.
+const QR_FALLBACK_DIR = "qr-fallback/";
+function qrFallbackUrl(bankCode, accNum) {
+  return `${QR_FALLBACK_DIR}${encodeURIComponent(bankCode || "")}-${encodeURIComponent(accNum || "")}.png`;
+}
 function onGenerateQr(e, opts) {
   if (e) e.preventDefault();
   const silent = opts && opts.silent;
@@ -2107,8 +2124,26 @@ function onGenerateQr(e, opts) {
     qrActiveLayer = layerNext;
   };
   imgNext.onerror = () => {
-    qrCard.classList.remove("loading");
-    showToast("Không tải được ảnh QR — img.vietqr.io có thể đang gián đoạn.", "err");
+    // Ảnh động lỗi (img.vietqr.io gián đoạn) — thử ảnh dự phòng tĩnh trong
+    // qr-fallback/ trước khi báo lỗi hẳn.
+    const fallbackUrl = qrFallbackUrl(acc.data__code, acc.data_num);
+    imgNext.onload = () => {
+      qrCard.classList.remove("loading");
+      imgNext.classList.add("visible");
+      imgCur.classList.remove("visible");
+      qrActiveLayer = layerNext;
+      // Ảnh dự phòng đang hiển thị — trỏ luôn nút tải/mở/copy link về ảnh
+      // này, tránh bấm vào lại ra link ảnh động đang lỗi.
+      $("#btnDownload").href = fallbackUrl;
+      $("#btnOpenLink").href = fallbackUrl;
+      $("#btnCopyLink").dataset.url = fallbackUrl;
+      showToast("img.vietqr.io đang gián đoạn — đang dùng ảnh QR dự phòng đã lưu sẵn (có thể không khớp đúng số tiền/nội dung vừa nhập).", "warn", { duration: 5000 });
+    };
+    imgNext.onerror = () => {
+      qrCard.classList.remove("loading");
+      showToast("Không tải được ảnh QR — img.vietqr.io có thể đang gián đoạn, và cũng chưa có ảnh dự phòng cho tài khoản này trong qr-fallback/.", "err");
+    };
+    imgNext.src = fallbackUrl;
   };
   imgNext.src = url;
   $("#qrCardBank").textContent = acc.data__name || acc.data__code;
@@ -2182,8 +2217,22 @@ function generateAdhocQr(opts) {
     adhocQrActiveLayer = layerNext;
   };
   imgNext.onerror = () => {
-    qrCard.classList.remove("loading");
-    showToast("Không tải được ảnh QR — img.vietqr.io có thể đang gián đoạn.", "err");
+    const fallbackUrl = qrFallbackUrl(adhocBank.code, accNum);
+    imgNext.onload = () => {
+      qrCard.classList.remove("loading");
+      imgNext.classList.add("visible");
+      imgCur.classList.remove("visible");
+      adhocQrActiveLayer = layerNext;
+      $("#adhocBtnDownload").href = fallbackUrl;
+      $("#adhocBtnOpenLink").href = fallbackUrl;
+      $("#adhocBtnCopyLink").dataset.url = fallbackUrl;
+      showToast("img.vietqr.io đang gián đoạn — đang dùng ảnh QR dự phòng đã lưu sẵn (có thể không khớp đúng số tiền/nội dung vừa nhập).", "warn", { duration: 5000 });
+    };
+    imgNext.onerror = () => {
+      qrCard.classList.remove("loading");
+      showToast("Không tải được ảnh QR — img.vietqr.io có thể đang gián đoạn, và cũng chưa có ảnh dự phòng cho tài khoản này trong qr-fallback/.", "err");
+    };
+    imgNext.src = fallbackUrl;
   };
   imgNext.src = url;
   $("#adhocQrCardBank").textContent = adhocBank.shortName || adhocBank.name || adhocBank.code;
@@ -2495,13 +2544,16 @@ function renderTemplatesTable() {
   const body = $("#templatesTableBody");
   if (!body) return;
   body.innerHTML = "";
+  const defaultValue = loadDefaults().template || "compact2";
   state.templates.forEach((t, idx) => {
+    const isDefault = t.value === defaultValue;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="stt-cell">${idx + 1}</td>
       <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}" title="${escapeAttr(t.value)}"></td>
       <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"></td>
       <td class="row-actions">
+        <button class="icon-btn${isDefault ? " is-default" : ""}" type="button" title="${isDefault ? "Đang là mẫu mặc định — áp dụng ở mọi nơi (form chính, thêm tài khoản...) mỗi khi mở lại trang" : "Đặt làm mẫu hiển thị mặc định"}" data-tpl-set-default="${idx}">${isDefault ? "★" : "☆"}</button>
         <button class="icon-btn order-btn" title="Đưa lên trên" data-tpl-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
         <button class="icon-btn order-btn" title="Đưa xuống dưới" data-tpl-move="${idx}" data-dir="1" ${idx === state.templates.length - 1 ? "disabled" : ""}>▼</button>
         <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
@@ -2519,6 +2571,23 @@ function renderTemplatesTable() {
       saveTemplatesCache();
       markDirty("templates");
       populateQrTemplateOptions();
+    });
+  });
+  body.querySelectorAll("[data-tpl-set-default]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.dataset.tplSetDefault);
+      const t = state.templates[idx];
+      if (!t || !t.value) return;
+      const defaults = loadDefaults();
+      defaults.template = t.value;
+      localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
+      renderTemplatesTable();
+      // Chỉ đổi mẫu hiển thị đang chọn trên form chính — KHÔNG gọi applyDefaults()
+      // ở đây vì hàm đó áp cả tài khoản mặc định, sẽ vô tình đổi luôn tài khoản
+      // người dùng đang chọn dở trên form chính dù họ chỉ đang đặt mặc định mẫu.
+      $("#qrTemplate").value = t.value;
+      updateCustomSelectTriggerLabel($("#qrTemplate"));
+      showToast(`Đã đặt "${t.label || t.value}" làm mẫu hiển thị mặc định`, "ok");
     });
   });
   body.querySelectorAll("[data-tpl-move]").forEach((btn) => {
