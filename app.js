@@ -10,7 +10,6 @@ const SHEET_ID = "1a4hAmtPz0KKJZ3il3lUGBewO8ku1JtDroB0DbAHqm2Q";
 const SHEET_TABS = {
   accounts: "TaiKhoan",
   presets: "MauChuyenTien",
-  content: "NoiDungGoiY",
   templates: "MauHienThi",
   amounts: "SoTienGoiY",
   banks: "Banks",
@@ -116,11 +115,6 @@ async function loadPresetsFromSheet() {
   }));
 }
 
-async function loadContentFromSheet() {
-  const rows = await fetchSheetTab(SHEET_TABS.content);
-  return rows.map((r) => pick(r, "content", "text", "value", "noidung") || Object.values(r)[0]).filter(Boolean);
-}
-
 async function loadTemplatesFromSheet() {
   const rows = await fetchSheetTab(SHEET_TABS.templates);
   return rows
@@ -156,7 +150,6 @@ let state = {
   refBanks: [],
   accounts: [],
   presets: [],
-  content: [],
   templates: [],
   amounts: [],
   selectedPresetIdx: null,
@@ -481,23 +474,6 @@ async function loadPresetsInitial() {
   } catch (e) {
     console.error(e);
     state.presets = [];
-  }
-}
-
-// ---------- Nội dung chuyển khoản gợi ý (nguồn: tab "NoiDungGoiY") ----------
-async function loadContentInitial() {
-  try {
-    state.content = await loadCachedSection("content", loadContentFromSheet, (fresh) => {
-      state.content = fresh;
-      renderContentSuggestions();
-    });
-  } catch (e) {
-    // Tab "NoiDungGoiY" có thể chưa được tạo trên Google Sheet — đây là tính
-    // năng tuỳ chọn (gợi ý nội dung chuyển khoản), không chặn app hoạt động,
-    // nên không hiện toast lỗi làm phiền mỗi lần mở trang. Vẫn log ra console
-    // để dễ tra khi cần debug.
-    console.warn('Không đọc được tab "NoiDungGoiY" (gợi ý nội dung) — có thể tab này chưa tồn tại trên Google Sheet:', e);
-    state.content = [];
   }
 }
 
@@ -1012,46 +988,6 @@ function renderAmountSuggestions() {
   });
 }
 
-// ---------- Gợi ý nội dung chuyển khoản: combobox ----------
-function renderContentSuggestions() {
-  const wrap = $("#contentSuggestions");
-  const toggle = $("#btnContentSuggestToggle");
-  if (!wrap || !toggle) return;
-  if (!state.content.length) {
-    toggle.hidden = true;
-    wrap.hidden = true;
-    wrap.innerHTML = "";
-    return;
-  }
-  toggle.hidden = false;
-  wrap.innerHTML = state.content
-    .map((c) => `<button type="button" class="combo-item" data-content="${escapeAttr(c)}">${escapeHtml(c)}</button>`)
-    .join("");
-  wrap.querySelectorAll(".combo-item[data-content]").forEach((item) => {
-    item.addEventListener("click", () => {
-      $("#qrContent").value = item.dataset.content;
-      updateContentCounter(item.dataset.content.trim());
-      closeContentSuggestions();
-      onGenerateQr(null, { silent: true });
-    });
-  });
-}
-function openContentSuggestions() {
-  const wrap = $("#contentSuggestions");
-  if (!wrap || !wrap.innerHTML.trim()) return;
-  wrap.hidden = false;
-}
-function closeContentSuggestions() {
-  const wrap = $("#contentSuggestions");
-  if (wrap) wrap.hidden = true;
-}
-function toggleContentSuggestions() {
-  const wrap = $("#contentSuggestions");
-  if (!wrap) return;
-  if (wrap.hidden) openContentSuggestions();
-  else closeContentSuggestions();
-}
-
 // Nút "Xoá thông tin" — trả form về trạng thái trống: xoá số tiền/nội dung
 // đang nhập, bỏ chọn mẫu đang gắn (nếu có). Không cần lưu trạng thái này lại
 // để khôi phục sau F5 nữa — trang giờ luôn mở lên ở trạng thái mặc định
@@ -1225,13 +1161,11 @@ async function init() {
   await loadAccountsInitial();
   await loadPresetsInitial();
   await loadTemplatesInitial();
-  await loadContentInitial();
   await loadAmountsInitial();
 
   populateQrTemplateOptions();
   populateQrAccounts();
   renderMauList();
-  renderContentSuggestions();
   renderQuickAmountsChips();
   enhanceSelect($("#qrAccount"));
   enhanceSelect($("#qrTemplate"));
@@ -1267,17 +1201,6 @@ async function init() {
   });
 
   $("#btnClearQrForm").addEventListener("click", clearQrForm);
-
-  $("#btnContentSuggestToggle").addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleContentSuggestions();
-  });
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".combo-wrap")) closeContentSuggestions();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeContentSuggestions();
-  });
 
   $("#btnClearActivePreset").addEventListener("click", clearActivePreset);
 

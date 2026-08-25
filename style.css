@@ -118,7 +118,7 @@ body{
 /* Đổi theme mượt */
 body,.app,.topbar,.pages,.gh-panel,.form-section,.qr-card,.qr-empty,.panel,
 table,thead th,tbody td,.mau-card,.mau-panel,.toast,
-.combo-menu,.footer,.gh-status-pill,.brand-mark,.count-badge,.field,
+.footer,.gh-status-pill,.brand-mark,.count-badge,.field,
 .hint,.status{
   transition:background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease;
 }
@@ -372,8 +372,8 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
   display:grid;place-items:center;flex:0 0 auto;
   transition:border-color .15s ease, color .15s ease, background-color .15s ease, transform .12s ease;
 }
-.btn.icon-only,.combo-toggle,.eye-btn,.mau-active-clear,.mau-card-del{flex:0 0 auto;}
-.combo-toggle,.eye-btn{z-index:2;}
+.btn.icon-only,.eye-btn,.mau-active-clear,.mau-card-del{flex:0 0 auto;}
+.eye-btn{z-index:2;}
 .icon-btn:hover{border-color:var(--danger);color:var(--danger);transform:translateY(-1px);}
 .row-confirm-btn:hover{border-color:var(--accent);color:var(--accent-dark);}
 .icon-btn:active{transform:scale(.92);}
@@ -523,30 +523,6 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 }
 .amount-words[hidden]{display:none;}
 
-.combo-wrap{position:relative;display:flex;}
-.combo-wrap input{flex:1;padding-right:34px;}
-.combo-toggle{
-  position:absolute;top:0;right:0;bottom:0;width:32px;
-  display:flex;align-items:center;justify-content:center;
-  background:transparent;border:none;color:var(--ink-faint);
-  font-size:13px;cursor:pointer;
-}
-.combo-toggle:hover{color:var(--accent-dark);}
-.combo-menu{
-  position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;
-  background:var(--bg-2);border:1px solid var(--border-strong);
-  border-radius:var(--radius-sm);padding:4px;max-height:220px;overflow-y:auto;
-  box-shadow:var(--card-glow);
-}
-.combo-item{
-  display:block;width:100%;text-align:left;background:transparent;border:none;
-  color:var(--ink);font-family:var(--body);font-size:12.5px;
-  padding:8px 9px;border-radius:5px;cursor:pointer;
-}
-.combo-item:hover,.combo-item.active{background:var(--accent-wash);color:var(--accent-dark);}
-.combo-row{display:flex;align-items:center;gap:4px;}
-.combo-row .combo-item{flex:1;}
-.combo-row .icon-btn{flex:none;width:24px;height:24px;font-size:11px;}
 .hint.inline-hint{margin:0;font-size:10.5px;}
 .field-warning{font-size:11px;color:var(--danger);margin-top:4px;min-height:0;}
 
