@@ -127,7 +127,10 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,
   -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
 }
 
-.app{max-width:min(1600px, 96vw);margin:0 auto;min-height:100vh;background:transparent;padding:18px 18px 0;}
+.app{
+  max-width:min(1600px, 96vw);margin:0 auto;min-height:100vh;background:transparent;padding:18px 18px 0;
+  display:flex;flex-direction:column;
+}
 
 .topbar{
   display:flex;align-items:center;justify-content:space-between;gap:14px;
@@ -168,7 +171,7 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,
   background:var(--panel-2);
 }
 
-.pages{padding:0 0 24px;}
+.pages{padding:0 0 24px;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;}
 
 .btn{
   position:relative;overflow:hidden;
@@ -470,17 +473,6 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 .field-label-row .link-btn{font-size:11px;flex:none;white-space:nowrap;}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .field-row .field{margin-bottom:0;}
-
-/* ---------- Thẻ chi tiết tài khoản đang chọn — hiển thị ngay dưới dropdown ---------- */
-.account-info-card{
-  margin-top:11px;padding:10px 12px;
-  background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);
-  display:flex;flex-direction:column;gap:6px;
-}
-.account-info-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
-.account-info-label{font-size:10.5px;color:var(--ink-faint);flex:none;}
-.account-info-value{font-size:12px;font-weight:600;color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.account-info-value.mono{font-family:var(--mono);}
 
 .qr-result-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:380px;margin:0 auto;}
 
