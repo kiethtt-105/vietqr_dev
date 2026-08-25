@@ -1,0 +1,13 @@
+{
+  "name": "qr-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VietQR generator - static site (HTML/CSS/JS, no build step)",
+  "scripts": {
+    "dev": "npx serve . -l 3000",
+    "deploy": "npx gh-pages -d ."
+  },
+  "devDependencies": {
+    "gh-pages": "^6.1.1"
+  }
+}
