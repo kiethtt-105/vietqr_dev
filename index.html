@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR Generator</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io https://cdn.vietqr.io https://vietqr.net; connect-src 'self' https://api.github.com https://api.vietqr.io https://img.vietqr.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io https://cdn.vietqr.io https://vietqr.net; connect-src 'self' https://docs.google.com https://img.vietqr.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -30,16 +30,6 @@
     </div>
 
     <div class="topbar-actions">
-      <div class="topbar-status-group">
-        <div class="gh-status-pill" id="ghStatusPill" title="Trạng thái kết nối GitHub">
-          <span class="dot" id="ghDot"></span>
-          <span id="ghStatusLabel">Chưa kết nối GitHub</span>
-        </div>
-        <div class="gh-status-pill autosave-pill" id="autosavePill" title="Trạng thái tự động lưu" hidden>
-          <span class="dot" id="autosaveDot"></span>
-          <span id="autosaveLabel">Đang lưu…</span>
-        </div>
-      </div>
       <div class="topbar-control-group">
         <button class="btn ghost icon-only" id="btnOpenSettings" type="button" title="Cài đặt" aria-label="Cài đặt">⚙</button>
       </div>
@@ -76,10 +66,6 @@
           <span class="settings-tabs-group-label">Cấu hình hiển thị</span>
           <button class="tab" type="button" data-settings-tab="templates">QR Templates</button>
           <button class="tab" type="button" data-settings-tab="vietqr">Ngân hàng (VietQR)</button>
-        </div>
-        <div class="settings-tabs-group">
-          <span class="settings-tabs-group-label">Kết nối &amp; lưu trữ (JSON)</span>
-          <button class="tab" type="button" data-settings-tab="github">GitHub</button>
         </div>
       </nav>
 
@@ -238,68 +224,6 @@
         </div>
       </div>
 
-      <div class="settings-tab-panel" id="settingsTabGithub" hidden>
-        <div class="gh-grid">
-          <label>
-            <span>Owner</span>
-            <input id="ghOwner" type="text" placeholder="vd: tuankiet">
-          </label>
-          <label>
-            <span>Repo</span>
-            <input id="ghRepo" type="text" placeholder="vd: vietqr-dev">
-          </label>
-          <label class="span2">
-            <span>Personal Access Token </span>
-            <div class="input-with-action">
-              <input id="ghToken" type="password" placeholder="github_pat_xxxxxxxxxxxx" autocomplete="off" autocapitalize="off" spellcheck="false">
-              <button class="icon-btn eye-btn" id="btnToggleTokenVisibility" type="button" aria-label="Hiện/ẩn token">👁</button>
-            </div>
-            <div class="token-check-row">
-              <button class="btn subtle" id="btnGhCheck" type="button">Kiểm tra kết nối</button>
-              <span class="status inline" id="ghCheckMsg"></span>
-            </div>
-          </label>
-        </div>
-
-        <!-- Branch/đường dẫn file: dùng giá trị mặc định, ẩn khỏi giao diện cho gọn.
-             Vẫn giữ input trong DOM (hidden) để app.js đọc/ghi state.gh bình thường,
-             không phải sửa lại toàn bộ logic đọc $("#ghXxx").value. -->
-        <div class="gh-grid" hidden>
-          <label>
-            <span>Branch</span>
-            <input id="ghBranch" type="text" placeholder="main" value="main">
-          </label>
-          <label>
-            <span>File tài khoản cá nhân</span>
-            <input id="ghPathAccounts" type="text" value="data/my-accounts.json">
-          </label>
-          <label>
-            <span>File mẫu chuyển tiền</span>
-            <input id="ghPathPresets" type="text" value="data/mau-chuyen-tien.json">
-          </label>
-          <label>
-            <span>File nội dung chuyển khoản</span>
-            <input id="ghPathContent" type="text" value="data/noi-dung-chuyen-khoan.json">
-          </label>
-          <label>
-            <span>File mẫu hiển thị QR</span>
-            <input id="ghPathTemplates" type="text" value="data/templates.json">
-          </label>
-          <label>
-            <span>File số tiền gợi ý</span>
-            <input id="ghPathAmounts" type="text" value="data/so-tien-goi-y.json">
-          </label>
-        </div>
-
-        <div class="gh-actions">
-          <button class="btn primary" id="btnGhSave" type="button">Lưu thông tin kết nối</button>
-          <button class="btn subtle" id="btnGhForget" type="button">Xoá token khỏi trình duyệt</button>
-        </div>
-
-        <p class="settings-hint">Dữ liệu sẽ tự động tải khi mở lại trang, và tự động lưu lên GitHub ngay khi bạn thêm/sửa/xoá — không cần bấm nút lưu thủ công.</p>
-        <p class="settings-hint">Các tab khác (Tài khoản, Nội dung, Số tiền, Mẫu hiển thị, Mẫu chuyển tiền, Ngân hàng VietQR) chỉ hiện ra sau khi token được xác thực thành công (có quyền ghi vào repo).</p>
-        <p class="status" id="ghMsg"></p>
-      </div>
       </div>
     </section>
   </div>
