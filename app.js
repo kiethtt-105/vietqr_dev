@@ -1177,13 +1177,11 @@ function formatCompactAmount(v) {
   return formatNumber(n);
 }
 
-// ---------- Workspace tabs (Tạo giao dịch / Mẫu giao dịch) ----------
-
-function switchWorkspaceTab(tabName) {
-  $$(".workspace-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.workspaceTab === tabName));
-  $("#tab-qr").hidden = tabName !== "qr";
-  $("#tab-mau").hidden = tabName !== "mau";
-  if (tabName === "mau") renderMauList();
+// ---------- Mẫu giao dịch & form Tạo giao dịch giờ hiển thị đồng thời trên
+// cùng 1 màn hình (không còn tách tab) — hàm này giữ lại để các chỗ gọi cũ
+// không bị lỗi, chỉ còn tác dụng làm mới danh sách mẫu.
+function switchWorkspaceTab() {
+  renderMauList();
 }
 
 function initRippleEffect() {
@@ -1237,10 +1235,6 @@ async function init() {
   renderQuickAmountsChips();
   enhanceSelect($("#qrAccount"));
   enhanceSelect($("#qrTemplate"));
-
-  $$(".workspace-tabs .tab").forEach((tab) => {
-    tab.addEventListener("click", () => switchWorkspaceTab(tab.dataset.workspaceTab));
-  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;

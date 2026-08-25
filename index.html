@@ -44,25 +44,16 @@
   </div>
 
   <div class="app-shell">
-  <nav class="tabs workspace-tabs">
-    <button class="tab active" type="button" data-workspace-tab="qr">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"></rect><rect x="14" y="3" width="7" height="7" rx="1.4"></rect><rect x="3" y="14" width="7" height="7" rx="1.4"></rect><path d="M14 14h3v3h-3zM14 20h7M20 14v3"></path></svg>
-      <span>Tạo giao dịch</span>
-    </button>
-    <button class="tab" type="button" data-workspace-tab="mau">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
-      <span>Mẫu giao dịch</span>
-    </button>
-  </nav>
   <div class="workspace">
+    <div class="workspace-grid">
 
-    <section class="panel mau-panel" id="tab-mau" hidden>
+    <section class="panel mau-panel" id="tab-mau">
       <div class="panel-head">
         <h2>Mẫu giao dịch</h2>
         <span class="count-badge" id="mauCount">0 mẫu</span>
       </div>
       <div class="mau-list" id="mauList"></div>
-      <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — điền form ở tab "Tạo giao dịch" rồi lưu.</p>
+      <p class="mau-empty" id="mauEmptyHint" hidden>Chưa có mẫu nào — điền form bên cạnh rồi lưu.</p>
     </section>
 
     <section class="panel" id="tab-qr">
@@ -178,7 +169,7 @@
 
     </section>
 
-  </div>
+    </div>
 
   </div>
 

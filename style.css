@@ -171,7 +171,7 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,
   background:var(--panel-2);
 }
 
-.pages{padding:0 0 24px;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;}
+.pages{padding:0 0 24px;flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;}
 
 .btn{
   position:relative;overflow:hidden;
@@ -324,6 +324,26 @@ input::placeholder{color:var(--ink-faint);}
 
 .workspace-tabs{max-width:360px;}
 
+/* ---------- Bố cục gộp: Mẫu | Form | QR trên cùng 1 màn hình, lấp đầy chiều rộng ---------- */
+.workspace-grid{
+  display:flex;flex-direction:column;gap:18px;align-items:stretch;
+}
+.workspace-grid .mau-panel{
+  max-width:none;margin:0;
+  border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--panel);box-shadow:var(--panel-shadow);
+  padding:14px 16px 16px;
+}
+.workspace-grid .mau-list{max-height:260px;}
+#tab-qr{min-width:0;}
+
+@media (min-width:1180px){
+  .workspace-grid{flex-direction:row;align-items:flex-start;gap:22px;}
+  .workspace-grid .mau-panel{flex:0 0 260px;width:260px;position:sticky;top:96px;}
+  .workspace-grid .mau-list{max-height:calc(100vh - 320px);}
+  #tab-qr{flex:1 1 auto;}
+}
+
 .panel{background:transparent;}
 .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
 .panel-head h2{font-size:14px;margin:0;font-weight:700;font-family:var(--display);}
@@ -430,8 +450,8 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 
 /* ---------- "Tạo giao dịch": [form nhập] bên trái làm trọng tâm, [kết quả QR] bên phải như biên lai đính kèm ---------- */
 .qr-layout{
-  display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,360px);gap:26px;align-items:start;
-  max-width:1040px;margin:0 auto;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,380px);gap:26px;align-items:start;
+  max-width:none;margin:0;
 }
 .qr-layout .qr-form{order:1;}
 .qr-layout .qr-result-wrap{order:2;position:sticky;top:82px;}
