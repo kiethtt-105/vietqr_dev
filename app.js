@@ -1484,7 +1484,7 @@ const MANAGE_UNLOCK_SESSION_KEY = "vietqr_manage_unlocked";
 //        crypto.subtle.digest("SHA-256", new TextEncoder().encode("MA-CUA-BAN"))
 //          .then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2,"0")).join("")))
 //   3. Copy chuỗi hex in ra, dán thay cho giá trị rỗng bên dưới.
-const MANAGE_SETUP_CODE_HASH = ""; // <-- dán hex SHA-256 của mã thiết lập vào đây
+const MANAGE_SETUP_CODE_HASH = "5ad52d5e4bf4b6e7dfb870c9eb46cc764d95810bc6558f77337a56340c69fc0e"; // <-- dán hex SHA-256 của mã thiết lập vào đây
 
 async function sha256Hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
