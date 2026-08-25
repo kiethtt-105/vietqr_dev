@@ -254,6 +254,17 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,.bank-picker-popup,
 .confirm-message{margin:0 0 16px;font-size:13.5px;color:var(--ink);line-height:1.5;}
 .confirm-actions{margin-top:0;justify-content:center;}
 .confirm-actions .btn{flex:1;justify-content:center;max-width:130px;}
+.prompt-panel .confirm-message{margin-bottom:10px;}
+.prompt-input{
+  width:100%;box-sizing:border-box;margin-bottom:10px;
+  background:var(--bg-1,#12141c);color:var(--ink);
+  border:1px solid var(--border);border-radius:10px;
+  padding:9px 12px;font-size:13.5px;font-family:var(--body,inherit);
+  text-align:center;letter-spacing:.04em;
+}
+.prompt-input:focus{outline:none;border-color:var(--accent);}
+.prompt-error{margin:0 0 10px;font-size:12px;color:var(--danger);line-height:1.4;}
+.prompt-error[hidden]{display:none;}
 .gh-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .gh-panel-head h2{font-size:14.5px;margin:0;font-weight:700;font-family:var(--display);}
 .gh-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}

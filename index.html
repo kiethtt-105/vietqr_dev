@@ -43,6 +43,18 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="promptBackdrop" hidden>
+    <section class="gh-panel confirm-panel prompt-panel" role="alertdialog" aria-modal="true" aria-label="Nhập mã">
+      <p class="confirm-message" id="promptMessage">Nhập mã:</p>
+      <input class="prompt-input" id="promptInput" type="password" autocomplete="off">
+      <p class="prompt-error" id="promptError" hidden></p>
+      <div class="gh-actions confirm-actions">
+        <button class="btn subtle" id="promptCancelBtn" type="button">Huỷ</button>
+        <button class="btn primary" id="promptOkBtn" type="button">Xác nhận</button>
+      </div>
+    </section>
+  </div>
+
 
   <div class="app-shell">
   <nav class="tabs workspace-tabs">

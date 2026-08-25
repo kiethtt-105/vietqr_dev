@@ -1464,6 +1464,79 @@ function formatCompactAmount(v) {
 const MANAGE_PASSKEY_ID_KEY = "vietqr_manage_passkey_id";
 const MANAGE_UNLOCK_SESSION_KEY = "vietqr_manage_unlocked";
 
+// ---------- Mã thiết lập (setup code) — chặn người lạ tự đăng ký passkey đầu tiên ----------
+// LƯU Ý QUAN TRỌNG VỀ GIỚI HẠN CỦA CƠ CHẾ NÀY (đọc trước khi đổi):
+// Vì đây là code chạy 100% ở trình duyệt và public trên GitHub, KHÔNG có cách nào giấu
+// một bí mật tuyệt đối trong file .js — ai cũng đọc được toàn bộ logic bên dưới. Cơ chế
+// này KHÔNG lưu mã gốc, chỉ lưu SHA-256 hash của mã (một chiều, không giải ngược ra mã
+// gốc được), nên người đọc source không thấy mã thật.
+// -> Việc này CHẶN được: người tình cờ vào link / bot / người không rành kỹ thuật bấm
+//    "Thiết lập Passkey" và tự đăng ký trước bạn.
+// -> Việc này KHÔNG chặn được: người rành kỹ thuật mở DevTools Console và tự gọi thẳng
+//    registerManagePasskey() để bỏ qua bước kiểm tra mã, hoặc brute-force hash nếu mã quá
+//    ngắn/dễ đoán. Nếu cần chặn cả trường hợp này thì bắt buộc phải có server xác thực —
+//    không thể làm được nếu chỉ dùng client-side thuần.
+//
+// CÁCH ĐẶT MÃ CỦA BẠN (tôi không biết mã, bạn tự chọn rồi tự tạo hash — không dán mã thật
+// dưới dạng chữ thường vào file này, chỉ dán hash):
+//   1. Mở Console của trình duyệt (F12) ở BẤT KỲ trang https nào (không cần mở app này).
+//   2. Chạy đoạn sau, thay "MA-CUA-BAN" bằng mã bạn muốn dùng (nên dài, khó đoán):
+//        crypto.subtle.digest("SHA-256", new TextEncoder().encode("MA-CUA-BAN"))
+//          .then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2,"0")).join("")))
+//   3. Copy chuỗi hex in ra, dán thay cho giá trị rỗng bên dưới.
+const MANAGE_SETUP_CODE_HASH = ""; // <-- dán hex SHA-256 của mã thiết lập vào đây
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function showPrompt(message, opts) {
+  return new Promise((resolve) => {
+    const backdrop = $("#promptBackdrop");
+    const input = $("#promptInput");
+    const okBtn = $("#promptOkBtn");
+    const cancelBtn = $("#promptCancelBtn");
+    const errEl = $("#promptError");
+    $("#promptMessage").textContent = message;
+    input.type = (opts && opts.type) || "text";
+    input.value = "";
+    errEl.hidden = true;
+    errEl.textContent = "";
+    backdrop.hidden = false;
+    input.focus();
+
+    function cleanup(result) {
+      backdrop.hidden = true;
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      backdrop.removeEventListener("click", onBackdropClick);
+      input.removeEventListener("keydown", onKeydown);
+      resolve(result);
+    }
+    function onOk() {
+      cleanup(input.value);
+    }
+    function onCancel() {
+      cleanup(null);
+    }
+    function onBackdropClick(e) {
+      if (e.target.id === "promptBackdrop") cleanup(null);
+    }
+    function onKeydown(e) {
+      if (e.key === "Escape") cleanup(null);
+      if (e.key === "Enter") {
+        e.preventDefault();
+        cleanup(input.value);
+      }
+    }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    backdrop.addEventListener("click", onBackdropClick);
+    input.addEventListener("keydown", onKeydown);
+  });
+}
+
 function passkeySupported() {
   return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && navigator.credentials.get);
 }
@@ -1587,8 +1660,9 @@ function renderManageGate() {
   } else {
     icon.textContent = "🔐";
     title.textContent = "Thiết lập khoá cho thiết bị này";
-    desc.textContent =
-      "Passkey được lưu ngay trên thiết bị này, không đưa lên GitHub hay bất kỳ server nào — mỗi thiết bị cần thiết lập riêng.";
+    desc.textContent = MANAGE_SETUP_CODE_HASH
+      ? "Passkey được lưu ngay trên thiết bị này, không đưa lên GitHub hay bất kỳ server nào. Cần nhập đúng mã thiết lập để đăng ký lần đầu."
+      : "Passkey được lưu ngay trên thiết bị này, không đưa lên GitHub hay bất kỳ server nào — mỗi thiết bị cần thiết lập riêng.";
     btn.textContent = "🔐 Thiết lập Passkey";
     btn.onclick = handleManageSetupClick;
   }
@@ -1598,6 +1672,25 @@ async function handleManageSetupClick() {
   const btn = $("#btnManageAction");
   const hint = $("#manageGateHint");
   const oldLabel = btn.textContent;
+
+  // Chỉ hỏi mã thiết lập nếu app đã được cấu hình mã (MANAGE_SETUP_CODE_HASH khác rỗng).
+  // Nếu chưa cấu hình, bỏ qua bước này để không tự khoá cứng người mới clone code lại.
+  if (MANAGE_SETUP_CODE_HASH) {
+    const code = await showPrompt("Nhập mã thiết lập để đăng ký passkey lần đầu cho thiết bị này:", { type: "password" });
+    if (code === null) return; // người dùng bấm huỷ
+    if (!code.trim()) {
+      hint.hidden = false;
+      hint.textContent = "Chưa nhập mã thiết lập.";
+      return;
+    }
+    const hash = await sha256Hex(code.trim());
+    if (hash !== MANAGE_SETUP_CODE_HASH) {
+      hint.hidden = false;
+      hint.textContent = "Mã thiết lập không đúng.";
+      return;
+    }
+  }
+
   btn.disabled = true;
   btn.textContent = "Đang thiết lập…";
   try {
