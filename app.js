@@ -17,7 +17,13 @@ const SHEET_TABS = {
 };
 
 function sheetTabUrl(tabName) {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
+  // headers=1: BẮT BUỘC Google hiểu dòng 1 là tên cột, không để nó tự đoán.
+  // Nếu không có tham số này, khi 1 cột có kiểu dữ liệu khác dòng tiêu đề
+  // (vd. cột "default" ở tab MauHienThi là chữ nhưng dữ liệu bên dưới là
+  // TRUE/FALSE/số), Google có thể đoán sai là "không có header" → code tìm
+  // cột theo tên (value/label/default...) sẽ không khớp được gì, kết quả
+  // trả về rỗng toàn bộ (đây là nguyên nhân làm ô "QR Templates" bị trống).
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent(tabName)}`;
 }
 
 // Đọc 1 tab và trả về mảng object { <tên_cột_ở_hàng_1>: <giá_trị>, ... }.
@@ -117,11 +123,13 @@ async function loadContentFromSheet() {
 
 async function loadTemplatesFromSheet() {
   const rows = await fetchSheetTab(SHEET_TABS.templates);
-  return rows.map((r) => ({
-    value: pick(r, "value"),
-    label: pick(r, "label"),
-    isDefault: sheetBool(pick(r, "default")),
-  }));
+  return rows
+    .map((r) => ({
+      value: pick(r, "value"),
+      label: pick(r, "label"),
+      isDefault: sheetBool(pick(r, "default")),
+    }))
+    .filter((t) => t.value); // bỏ dòng rác không đọc được cột "value" (vd. lỗi đoán cột header)
 }
 
 async function loadAmountsFromSheet() {
@@ -322,6 +330,13 @@ function loadCachedSection(cacheKey, fetchFn, onFresh) {
   if (cached) {
     fetchFn()
       .then((fresh) => {
+        // Nếu bản mới tải về bị rỗng (Sheet lỗi tạm thời, sai tên cột...) thì
+        // KHÔNG ghi đè cache/UI bằng mảng rỗng — giữ nguyên dữ liệu cũ đã có,
+        // tránh làm dropdown/danh sách đang hiển thị bỗng dưng trống trơn.
+        if (Array.isArray(fresh) && fresh.length === 0 && Array.isArray(cached) && cached.length > 0) {
+          console.warn(`Làm mới "${cacheKey}" trả về rỗng, giữ nguyên dữ liệu cũ đã cache.`);
+          return;
+        }
         writeSheetCache(cacheKey, fresh);
         onFresh(fresh);
       })
@@ -636,6 +651,9 @@ function populateQrTemplateOptions() {
       sel.value = defaultTemplate;
     }
     updateCustomSelectTriggerLabel(sel);
+    // Nếu panel dropdown tuỳ biến đang mở đúng lúc danh sách này được tải/làm
+    // mới lại (vd. dữ liệu Sheet vừa về ở nền), vẽ lại panel luôn cho khớp.
+    if (customSelectOpenEl === sel) renderCustomSelectList(sel);
   });
 }
 
