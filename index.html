@@ -49,6 +49,7 @@
     <button class="tab active" type="button" data-workspace-tab="qr">Tạo giao dịch</button>
     <button class="tab" type="button" data-workspace-tab="mau">Mẫu giao dịch</button>
     <button class="tab" type="button" data-workspace-tab="adhoc">Thêm Tài Khoản</button>
+    <button class="tab tab-manage" type="button" data-workspace-tab="quanly">🔒 Quản lý</button>
   </nav>
   <div class="workspace">
 
@@ -229,6 +230,50 @@
           </div>
         </div>
 
+      </div>
+
+    </section>
+
+    <section class="panel manage-panel" id="tab-quanly" hidden>
+
+      <div class="manage-gate" id="manageGate">
+        <div class="manage-gate-icon" id="manageGateIcon">🔒</div>
+        <h2 class="manage-gate-title" id="manageGateTitle">Khu vực quản lý</h2>
+        <p class="manage-gate-desc" id="manageGateDesc">Mở khoá bằng vân tay / Face ID / mã PIN của thiết bị này.</p>
+        <button class="btn primary" type="button" id="btnManageAction">Mở khoá bằng Passkey</button>
+        <p class="manage-gate-hint" id="manageGateHint" hidden></p>
+      </div>
+
+      <div class="manage-dashboard" id="manageDashboard" hidden>
+        <div class="manage-head">
+          <h2>Quản lý</h2>
+          <div class="manage-head-actions">
+            <button class="btn subtle" type="button" id="btnManageRefresh">⟳ Làm mới dữ liệu</button>
+            <button class="btn subtle" type="button" id="btnManageLock">🔒 Khoá lại</button>
+          </div>
+        </div>
+
+        <div class="manage-stats" id="manageStats"></div>
+
+        <div class="manage-section">
+          <h3 class="form-section-title">Tài khoản đã lưu</h3>
+          <div class="manage-table-wrap">
+            <table class="manage-table" id="manageAccountsTable"></table>
+          </div>
+        </div>
+
+        <div class="manage-section">
+          <h3 class="form-section-title">Mẫu giao dịch</h3>
+          <div class="manage-table-wrap">
+            <table class="manage-table" id="managePresetsTable"></table>
+          </div>
+        </div>
+
+        <div class="manage-section manage-danger">
+          <h3 class="form-section-title">Thiết bị &amp; khoá truy cập</h3>
+          <p class="manage-danger-desc">Passkey chỉ lưu trên thiết bị/trình duyệt này (không lưu trên GitHub hay bất kỳ server nào) — mỗi thiết bị cần tự thiết lập riêng.</p>
+          <button class="btn subtle danger-outline" type="button" id="btnManageResetPasskey">Gỡ khoá thiết bị này</button>
+        </div>
       </div>
 
     </section>

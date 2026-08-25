@@ -1454,12 +1454,300 @@ function formatCompactAmount(v) {
 }
 
 // ---------- Workspace tabs (Tạo giao dịch / Mẫu giao dịch) ----------
+// ---------- Tab "Quản lý" — khoá bằng Passkey của THIẾT BỊ, không lưu mật khẩu ----------
+// Vì code public trên GitHub nên không thể giấu mật khẩu trong source (ai đọc code
+// cũng thấy). Passkey (WebAuthn) giải quyết đúng vấn đề này: khoá riêng (private key)
+// không bao giờ rời khỏi thiết bị (nằm trong chip bảo mật/OS), trình duyệt chỉ lưu lại
+// ID của khoá công khai trong localStorage — thứ này vô hại nếu lộ ra, không dùng để
+// mở khoá được nếu không có đúng thiết bị + vân tay/Face ID/PIN. Mỗi thiết bị cần tự
+// thiết lập passkey riêng (không đồng bộ qua GitHub hay server nào).
+const MANAGE_PASSKEY_ID_KEY = "vietqr_manage_passkey_id";
+const MANAGE_UNLOCK_SESSION_KEY = "vietqr_manage_unlocked";
+
+function passkeySupported() {
+  return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && navigator.credentials.get);
+}
+function bufToBase64url(buf) {
+  let str = "";
+  new Uint8Array(buf).forEach((b) => (str += String.fromCharCode(b)));
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function base64urlToBuf(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64url.length + 3) % 4);
+  const str = atob(b64);
+  const bytes = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
+  return bytes.buffer;
+}
+function randomBytes(n) {
+  const arr = new Uint8Array(n);
+  crypto.getRandomValues(arr);
+  return arr;
+}
+function getStoredPasskeyId() {
+  try {
+    return localStorage.getItem(MANAGE_PASSKEY_ID_KEY);
+  } catch (e) {
+    return null;
+  }
+}
+function setStoredPasskeyId(id) {
+  try {
+    localStorage.setItem(MANAGE_PASSKEY_ID_KEY, id);
+  } catch (e) {}
+}
+function clearStoredPasskeyId() {
+  try {
+    localStorage.removeItem(MANAGE_PASSKEY_ID_KEY);
+  } catch (e) {}
+}
+function isManageUnlockedThisSession() {
+  try {
+    return sessionStorage.getItem(MANAGE_UNLOCK_SESSION_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+function setManageUnlockedThisSession(v) {
+  try {
+    if (v) sessionStorage.setItem(MANAGE_UNLOCK_SESSION_KEY, "1");
+    else sessionStorage.removeItem(MANAGE_UNLOCK_SESSION_KEY);
+  } catch (e) {}
+}
+
+async function registerManagePasskey() {
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      challenge: randomBytes(32),
+      rp: { name: "VietQR Generator" },
+      user: { id: randomBytes(16), name: "quanly@thiet-bi-nay", displayName: "Quản lý (thiết bị này)" },
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 }, // ES256
+        { type: "public-key", alg: -257 }, // RS256
+      ],
+      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+      timeout: 60000,
+      attestation: "none",
+    },
+  });
+  if (!cred) throw new Error("Không tạo được passkey");
+  setStoredPasskeyId(bufToBase64url(cred.rawId));
+}
+async function verifyManagePasskey() {
+  const storedId = getStoredPasskeyId();
+  if (!storedId) throw new Error("Chưa thiết lập passkey trên thiết bị này");
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge: randomBytes(32),
+      allowCredentials: [{ id: base64urlToBuf(storedId), type: "public-key" }],
+      userVerification: "required",
+      timeout: 60000,
+    },
+  });
+  if (!assertion) throw new Error("Xác thực thất bại");
+}
+
+function renderManageGate() {
+  const gate = $("#manageGate");
+  const dash = $("#manageDashboard");
+  if (!gate || !dash) return;
+
+  if (isManageUnlockedThisSession()) {
+    gate.hidden = true;
+    dash.hidden = false;
+    renderManageDashboard();
+    return;
+  }
+  dash.hidden = true;
+  gate.hidden = false;
+
+  const icon = $("#manageGateIcon");
+  const title = $("#manageGateTitle");
+  const desc = $("#manageGateDesc");
+  const btn = $("#btnManageAction");
+  const hint = $("#manageGateHint");
+  hint.hidden = true;
+  hint.textContent = "";
+
+  if (!passkeySupported()) {
+    icon.textContent = "⚠️";
+    title.textContent = "Trình duyệt này không hỗ trợ Passkey";
+    desc.textContent = "Hãy dùng Chrome/Edge/Safari bản mới, hoặc mở trên điện thoại có vân tay/Face ID.";
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+
+  if (getStoredPasskeyId()) {
+    icon.textContent = "🔒";
+    title.textContent = "Khu vực quản lý — đã khoá";
+    desc.textContent = "Mở khoá bằng vân tay / Face ID / mã PIN của thiết bị này.";
+    btn.textContent = "🔓 Mở khoá bằng Passkey";
+    btn.onclick = handleManageUnlockClick;
+  } else {
+    icon.textContent = "🔐";
+    title.textContent = "Thiết lập khoá cho thiết bị này";
+    desc.textContent =
+      "Passkey được lưu ngay trên thiết bị này, không đưa lên GitHub hay bất kỳ server nào — mỗi thiết bị cần thiết lập riêng.";
+    btn.textContent = "🔐 Thiết lập Passkey";
+    btn.onclick = handleManageSetupClick;
+  }
+}
+
+async function handleManageSetupClick() {
+  const btn = $("#btnManageAction");
+  const hint = $("#manageGateHint");
+  const oldLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Đang thiết lập…";
+  try {
+    await registerManagePasskey();
+    setManageUnlockedThisSession(true);
+    showToast("Đã thiết lập passkey cho thiết bị này", "ok");
+    renderManageGate();
+  } catch (e) {
+    console.error(e);
+    hint.hidden = false;
+    hint.textContent = "Không thiết lập được passkey — thiết bị có thể chưa hỗ trợ vân tay/Face ID/PIN, hoặc bạn đã huỷ thao tác.";
+    btn.disabled = false;
+    btn.textContent = oldLabel;
+  }
+}
+async function handleManageUnlockClick() {
+  const btn = $("#btnManageAction");
+  const hint = $("#manageGateHint");
+  const oldLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Đang xác thực…";
+  try {
+    await verifyManagePasskey();
+    setManageUnlockedThisSession(true);
+    renderManageGate();
+  } catch (e) {
+    console.error(e);
+    hint.hidden = false;
+    hint.textContent = "Xác thực thất bại hoặc đã huỷ — thử lại.";
+    btn.disabled = false;
+    btn.textContent = oldLabel;
+  }
+}
+function lockManageTab() {
+  setManageUnlockedThisSession(false);
+  renderManageGate();
+  showToast("Đã khoá lại", "ok");
+}
+function resetManagePasskey() {
+  showConfirm("Gỡ passkey đã thiết lập trên thiết bị này? Lần sau mở tab Quản lý sẽ phải thiết lập lại.", "Gỡ khoá").then((ok) => {
+    if (!ok) return;
+    clearStoredPasskeyId();
+    setManageUnlockedThisSession(false);
+    showToast("Đã gỡ passkey trên thiết bị này", "ok");
+    renderManageGate();
+  });
+}
+
+function formatCacheAge(cacheKey) {
+  const cached = readSheetCache(cacheKey);
+  if (!cached) return "chưa có cache";
+  try {
+    const raw = localStorage.getItem(SHEET_CACHE_PREFIX + cacheKey);
+    const parsed = JSON.parse(raw);
+    const diffMin = Math.round((Date.now() - parsed.ts) / 60000);
+    if (diffMin < 1) return "vừa xong";
+    if (diffMin < 60) return `${diffMin} phút trước`;
+    return `${Math.round(diffMin / 60)} giờ trước`;
+  } catch (e) {
+    return "—";
+  }
+}
+
+function renderManageDashboard() {
+  const statsWrap = $("#manageStats");
+  if (statsWrap) {
+    const stats = [
+      { label: "Tài khoản", value: state.accounts.length },
+      { label: "Mẫu giao dịch", value: state.presets.length },
+      { label: "Ngân hàng hỗ trợ", value: state.refBanks.length },
+      { label: "Đồng bộ gần nhất", value: formatCacheAge("accounts") },
+    ];
+    statsWrap.innerHTML = stats
+      .map(
+        (s) =>
+          `<div class="manage-stat-card"><span class="manage-stat-value">${escapeHtml(String(s.value))}</span><span class="manage-stat-label">${escapeHtml(s.label)}</span></div>`
+      )
+      .join("");
+  }
+
+  const accTable = $("#manageAccountsTable");
+  if (accTable) {
+    const rows = state.accounts
+      .map(
+        (a) =>
+          `<tr><td>${escapeHtml(a.list_name)}</td><td>${escapeHtml(a.data__code)}</td><td class="mono">${escapeHtml(a.data_num)}</td><td>${a.isDefault ? '<span class="manage-tag">Mặc định</span>' : ""}</td></tr>`
+      )
+      .join("");
+    accTable.innerHTML = `<thead><tr><th>Tên gợi nhớ</th><th>NH</th><th>Số TK</th><th></th></tr></thead><tbody>${
+      rows || `<tr><td colspan="4" class="manage-empty-row">Chưa có tài khoản nào</td></tr>`
+    }</tbody>`;
+  }
+
+  const presetTable = $("#managePresetsTable");
+  if (presetTable) {
+    const rows = state.presets
+      .map(
+        (p) =>
+          `<tr><td>${escapeHtml(p.name || "—")}</td><td>${escapeHtml(p.accountName || p.bankCode || "—")}</td><td>${
+            p.amount ? escapeHtml(formatNumber(p.amount)) + "đ" : "—"
+          }</td></tr>`
+      )
+      .join("");
+    presetTable.innerHTML = `<thead><tr><th>Tên mẫu</th><th>Tài khoản</th><th>Số tiền</th></tr></thead><tbody>${
+      rows || `<tr><td colspan="3" class="manage-empty-row">Chưa có mẫu nào</td></tr>`
+    }</tbody>`;
+  }
+}
+
+async function refreshManageData() {
+  const btn = $("#btnManageRefresh");
+  const oldLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Đang làm mới…";
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(SHEET_CACHE_PREFIX))
+      .forEach((k) => localStorage.removeItem(k));
+    await Promise.all([
+      loadRefBanks(),
+      loadAccountsInitial(),
+      loadPresetsInitial(),
+      loadTemplatesInitial(),
+      loadContentInitial(),
+      loadAmountsInitial(),
+    ]);
+    populateQrTemplateOptions();
+    populateQrAccounts();
+    renderMauList();
+    renderContentSuggestions();
+    renderQuickAmountsChips();
+    renderManageDashboard();
+    showToast("Đã làm mới dữ liệu từ Google Sheet", "ok");
+  } catch (e) {
+    console.error(e);
+    showToast("Làm mới dữ liệu thất bại", "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldLabel;
+  }
+}
+
 function switchWorkspaceTab(tabName) {
   $$(".workspace-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.workspaceTab === tabName));
   $("#tab-qr").hidden = tabName !== "qr";
   $("#tab-mau").hidden = tabName !== "mau";
   $("#tab-adhoc").hidden = tabName !== "adhoc";
+  $("#tab-quanly").hidden = tabName !== "quanly";
   if (tabName === "mau") renderMauList();
+  if (tabName === "quanly") renderManageGate();
 }
 
 function initRippleEffect() {
@@ -1520,6 +1808,9 @@ async function init() {
   $$(".workspace-tabs .tab").forEach((tab) => {
     tab.addEventListener("click", () => switchWorkspaceTab(tab.dataset.workspaceTab));
   });
+  $("#btnManageRefresh").addEventListener("click", refreshManageData);
+  $("#btnManageLock").addEventListener("click", lockManageTab);
+  $("#btnManageResetPasskey").addEventListener("click", resetManagePasskey);
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
