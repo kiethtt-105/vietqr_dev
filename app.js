@@ -4,18 +4,6 @@ const LS_FORM_STATE = "vietqr_form_state";
 const ADDINFO_SOFT_LIMIT = 90;
 const AMOUNT_WARN_THRESHOLD = 500_000_000;
 
-// Giá trị mặc định khi chưa có data/templates.json và chưa từng lưu gì (dùng làm fallback).
-const DEFAULT_QR_TEMPLATES = [
-  { value: "compact2", label: "Compact 2" },
-  { value: "compact", label: "Compact" },
-  { value: "print", label: "Print" },
-  { value: "qr_only", label: "Chỉ mã QR" },
-];
-
-// Giá trị mặc định cho các nút "số tiền nhanh" khi chưa có data/so-tien-goi-y.json
-// và chưa từng lưu gì (dùng làm fallback), tương tự DEFAULT_QR_TEMPLATES ở trên.
-const DEFAULT_SUGGESTED_AMOUNTS = [20000, 50000, 100000, 200000, 500000, 1000000];
-
 // ============================================================
 // GOOGLE SHEETS (nguồn dữ liệu duy nhất — CHỈ ĐỌC, không ghi/sửa)
 // ============================================================
@@ -303,35 +291,6 @@ async function loadRefBanks() {
     state.refBanks = [];
   }
 }
-async function refreshRefBanksFromVietQR() {
-  const btn = $("#btnRefreshBanks");
-  const original = btn.textContent;
-  btn.classList.add("is-loading");
-  btn.disabled = true;
-  try {
-    const banks = await loadBanksFromSheet();
-    if (!banks.length) throw new Error("Không đọc được dữ liệu ngân hàng từ Google Sheet");
-    state.refBanks = banks;
-    renderTable();
-    renderVietqrBanksTable();
-    btn.classList.remove("is-loading");
-    btn.textContent = `Đã cập nhật ${state.refBanks.length} ngân hàng ✓`;
-  } catch (err) {
-    console.error(err);
-    btn.classList.remove("is-loading");
-    btn.textContent = "Lỗi tải — thử lại sau";
-  } finally {
-    setTimeout(() => {
-      btn.textContent = original;
-      btn.disabled = false;
-    }, 2500);
-  }
-}
-function bankLabelForRow(acc) {
-  if (!acc || !acc.data__code) return "";
-  return `${acc.data__name || acc.data__shortName || ""} — ${acc.data__code}`;
-}
-
 // ---------- Popup tìm/lọc ngân hàng (thay cho <select> dài, khó tìm khi có nhiều ngân hàng) ----------
 let bankPickerOpenIdx = null;
 function closeBankPicker() {
@@ -383,16 +342,8 @@ function renderBankPickerList(idx, query) {
   });
 }
 function selectBankForRow(idx, code) {
-  if (idx === "adhoc") {
-    selectAdhocBank(code);
-    closeBankPicker();
-    return;
-  }
-  applyBankToRow(idx, code);
-  markDirty("accounts");
+  selectAdhocBank(code);
   closeBankPicker();
-  renderTable();
-  populateQrAccounts();
 }
 function openBankPicker(idx, inputEl) {
   bankPickerOpenIdx = idx;
@@ -537,39 +488,23 @@ async function loadContentInitial() {
 // ---------- Số tiền gợi ý (nguồn: tab "SoTienGoiY") ----------
 async function loadAmountsInitial() {
   try {
-    const amounts = await loadAmountsFromSheet();
-    state.amounts = amounts.length ? amounts : DEFAULT_SUGGESTED_AMOUNTS.slice();
+    state.amounts = await loadAmountsFromSheet();
   } catch (e) {
     console.error(e);
-    state.amounts = DEFAULT_SUGGESTED_AMOUNTS.slice();
+    state.amounts = [];
+    showToast("Không đọc được Số tiền gợi ý từ Google Sheet", "err");
   }
 }
 
 // ---------- Mẫu hiển thị QR (nguồn: tab "MauHienThi") ----------
 async function loadTemplatesInitial() {
   try {
-    const templates = await loadTemplatesFromSheet();
-    state.templates = templates.length ? templates : DEFAULT_QR_TEMPLATES.slice();
+    state.templates = await loadTemplatesFromSheet();
   } catch (e) {
     console.error(e);
-    state.templates = DEFAULT_QR_TEMPLATES.slice();
+    state.templates = [];
+    showToast("Không đọc được Mẫu hiển thị QR từ Google Sheet", "err");
   }
-}
-function applyBankToRow(idx, bankCode) {
-  const bank = state.refBanks.find((b) => b.code === bankCode);
-  if (!bank) return;
-  const row = state.accounts[idx];
-  row.data__id = bank.id;
-  row.data__name = bank.shortName;
-  row.data__code = bank.code;
-  row.data__bin = bank.bin;
-  row.data__shortName = bank.shortName;
-  row.data__logo = bank.logo;
-  row.data__short_name = bank.short_name;
-}
-function buildAccountVietQrLink(acc) {
-  if (!acc || !acc.data__code || !acc.data_num) return "";
-  return buildQrUrlRaw(acc.data__code, acc.data_num, "", "", "compact2", acc.name_ac || "");
 }
 // ---------- Thứ tự hiển thị (STT) ----------
 function renumberAccountsStt() {
@@ -584,179 +519,6 @@ function sortAccountsByStt() {
   }
   renumberAccountsStt();
 }
-function moveAccountRow(idx, dir) {
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= state.accounts.length) return;
-  const tmp = state.accounts[idx];
-  state.accounts[idx] = state.accounts[newIdx];
-  state.accounts[newIdx] = tmp;
-  renumberAccountsStt();
-  markDirty("accounts");
-  renderTable();
-  populateQrAccounts();
-}
-function renderTable() {
-  const body = $("#bankTableBody");
-  const q = ($("#accountSearch")?.value || "").trim().toLowerCase();
-  const sortable = !q;
-  body.innerHTML = "";
-  let shown = 0;
-  state.accounts.forEach((acc, idx) => {
-    if (q) {
-      const hay = `${acc.list_name || ""} ${acc.data_num || ""} ${acc.name_ac || ""}`.toLowerCase();
-      if (!hay.includes(q)) return;
-    }
-    shown++;
-    acc.vietqr_link = buildAccountVietQrLink(acc);
-    const hasLink = !!acc.vietqr_link;
-    const tr = document.createElement("tr");
-    if (acc.hidden) tr.classList.add("row-hidden");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Tên gợi nhớ"><input data-idx="${idx}" data-field="list_name" value="${escapeAttr(acc.list_name)}" title="${escapeAttr(acc.list_name)}"></td>
-      <td data-label="Số tài khoản"><input data-idx="${idx}" data-field="data_num" value="${escapeAttr(acc.data_num)}" title="${escapeAttr(acc.data_num)}"></td>
-      <td data-label="Chủ tài khoản"><input data-idx="${idx}" data-field="name_ac" value="${escapeAttr(acc.name_ac)}" title="${escapeAttr(acc.name_ac)}"></td>
-      <td data-label="Ngân hàng">
-        <input type="text" class="bank-input" data-idx="${idx}" autocomplete="off"
-          placeholder="🔎 Tìm ngân hàng…" value="${escapeAttr(bankLabelForRow(acc))}">
-      </td>
-      <td class="row-actions">
-        ${hasLink
-          ? `<a class="icon-btn" href="${escapeAttr(acc.vietqr_link)}" target="_blank" rel="noopener noreferrer" title="Mở link VietQR">🔗</a>
-             <button class="icon-btn" type="button" title="Sao chép link VietQR" data-copy-link="${idx}">📋</button>`
-          : `<button class="icon-btn" type="button" disabled title="Điền STK &amp; ngân hàng để có link VietQR">🔗</button>`}
-        <button class="icon-btn${acc.isDefault ? " is-default" : ""}" type="button" title="${acc.isDefault ? "Đang là tài khoản mặc định — bấm để bỏ" : "Đặt làm tài khoản mặc định"}" data-toggle-default="${idx}">${acc.isDefault ? "★" : "☆"}</button>
-        <button class="icon-btn${acc.hidden ? " is-hidden-on" : ""}" type="button" title="${acc.hidden ? "Đang ẩn khỏi danh sách chọn nhanh — bấm để hiện lại" : "Ẩn khỏi danh sách chọn nhanh (vẫn giữ dữ liệu)"}" data-toggle-hidden="${idx}">${acc.hidden ? "🚫" : "👁"}</button>
-        <button class="icon-btn order-btn" title="Đưa lên trên" data-move="${idx}" data-dir="-1" ${!sortable || idx === 0 ? "disabled" : ""}>▲</button>
-        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-move="${idx}" data-dir="1" ${!sortable || idx === state.accounts.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn" title="Xoá dòng" data-del="${idx}">✕</button>
-      </td>`;
-    body.appendChild(tr);
-  });
-  $("#rowCount").textContent = q ? `${shown}/${state.accounts.length} dòng` : `${state.accounts.length} dòng`;
-  if (!state.refBanks.length) {
-    showToast("Chưa có danh sách ngân hàng — thử bấm nút làm mới.", "err");
-  }
-
-  body.querySelectorAll("input[data-field]").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      const idx = Number(e.target.dataset.idx);
-      const field = e.target.dataset.field;
-      state.accounts[idx][field] = e.target.value;
-      markDirty("accounts");
-      populateQrAccounts();
-    });
-  });
-  body.querySelectorAll("input.bank-input").forEach((input) => {
-    input.addEventListener("focus", (e) => openBankPicker(Number(e.target.dataset.idx), e.target));
-    input.addEventListener("click", (e) => openBankPicker(Number(e.target.dataset.idx), e.target));
-    input.addEventListener("input", (e) => renderBankPickerList(Number(e.target.dataset.idx), e.target.value));
-    input.addEventListener("blur", (e) => {
-
-      const i = Number(e.target.dataset.idx);
-      e.target.value = bankLabelForRow(state.accounts[i]);
-    });
-  });
-  body.querySelectorAll("[data-copy-link]").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const idx = Number(e.currentTarget.dataset.copyLink);
-      const link = state.accounts[idx]?.vietqr_link || "";
-      if (!link) return;
-      try {
-        await navigator.clipboard.writeText(link);
-        showToast("Đã sao chép link VietQR", "ok");
-      } catch (err) {
-        showToast("Không sao chép được — hãy sao chép thủ công.", "err");
-      }
-    });
-  });
-  body.querySelectorAll("[data-toggle-default]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.toggleDefault);
-      const acc = state.accounts[idx];
-      if (!acc) return;
-      const turningOn = !acc.isDefault;
-      state.accounts.forEach((a) => {
-        a.isDefault = false;
-      });
-      if (turningOn) {
-        acc.isDefault = true;
-        acc.hidden = false; // tài khoản mặc định thì không thể ở trạng thái ẩn
-      }
-      markDirty("accounts");
-      renderTable();
-      populateQrAccounts();
-      showToast(turningOn ? `Đã đặt "${acc.list_name || acc.data_num}" làm mặc định` : "Đã bỏ tài khoản mặc định", "ok");
-    });
-  });
-  body.querySelectorAll("[data-toggle-hidden]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.toggleHidden);
-      const acc = state.accounts[idx];
-      if (!acc) return;
-      acc.hidden = !acc.hidden;
-      if (acc.hidden) acc.isDefault = false; // ẩn thì không thể là mặc định
-      markDirty("accounts");
-      renderTable();
-      populateQrAccounts();
-      showToast(acc.hidden ? `Đã ẩn "${acc.list_name || acc.data_num}" khỏi danh sách chọn nhanh` : `Đã hiện lại "${acc.list_name || acc.data_num}"`, "ok");
-    });
-  });
-  body.querySelectorAll("[data-move]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.move);
-      const dir = Number(e.currentTarget.dataset.dir);
-      moveAccountRow(idx, dir);
-    });
-  });
-  body.querySelectorAll("[data-del]").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const idx = Number(e.target.dataset.del);
-      const removedAcc = state.accounts[idx];
-      const name = removedAcc.list_name || `dòng ${idx + 1}`;
-      const ok = await showConfirm(`Xoá tài khoản "${name}"?`, "Xoá");
-      if (!ok) return;
-      state.accounts.splice(idx, 1);
-      renumberAccountsStt();
-      markDirty("accounts");
-      renderTable();
-      populateQrAccounts();
-      showToast(`Đã xoá "${name}"`, "ok");
-    });
-  });
-}
-async function addRow() {
-  const btn = $("#btnAddRow");
-  if (!state.refBanks.length) {
-    const original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = "Đang tải ngân hàng…";
-    await refreshRefBanksFromVietQR();
-    btn.disabled = false;
-    btn.textContent = original;
-  }
-  const defaultBank = state.refBanks[0] || {};
-  state.accounts.push({
-    data__id: defaultBank.id || 0,
-    list_name: "",
-    data_num: "",
-    name_ac: "",
-    data__name: defaultBank.shortName || "",
-    data__code: defaultBank.code || "",
-    data__bin: defaultBank.bin || "",
-    data__shortName: defaultBank.shortName || "",
-    data__logo: defaultBank.logo || "",
-    data__short_name: defaultBank.short_name || "",
-    vietqr_link: "",
-    hidden: false,
-    isDefault: false,
-  });
-  renumberAccountsStt();
-  markDirty("accounts");
-  renderTable();
-  populateQrAccounts();
-}
-
 // ---------- Mặc định: tài khoản + mẫu hiển thị QR ----------
 function normalizeAccountFields(list) {
   (list || []).forEach((a) => {
@@ -825,7 +587,6 @@ function setDefaultAccount() {
   });
   acc.isDefault = true;
   markDirty("accounts");
-  renderTable();
   flashLinkBtn("#btnSetDefaultAccount", "★ ");
   showToast(`Đã đặt "${acc.list_name || acc.data_num}" làm tài khoản mặc định`, "ok");
 }
@@ -965,166 +726,8 @@ function renderMauList() {
       deleteMauPreset(Number(btn.dataset.del));
     });
   });
-  renderMauTable();
 }
 
-// ---------- Cài đặt: Mẫu chuyển tiền (bảng sửa trực tiếp) ----------
-function mauAccountOptionsHtml(selectedIdx) {
-  let html = `<option value="">— Chọn tài khoản —</option>`;
-  html += state.accounts
-    .map((a, i) => {
-      const bank = a.data__shortName || a.data__name || a.data__code || "?";
-      const label = `${a.list_name || "(chưa đặt tên)"} — ${a.data_num || "?"} (${bank})${a.hidden ? " (Đã ẩn)" : ""}`;
-      return `<option value="${i}" ${i === selectedIdx ? "selected" : ""}>${escapeHtml(label)}</option>`;
-    })
-    .join("");
-  return html;
-}
-function mauAccountSelectedLabel(selectedIdx) {
-  const a = state.accounts[selectedIdx];
-  if (!a) return "— Chọn tài khoản —";
-  const bank = a.data__shortName || a.data__name || a.data__code || "?";
-  return `${a.list_name || "(chưa đặt tên)"} — ${a.data_num || "?"} (${bank})${a.hidden ? " (Đã ẩn)" : ""}`;
-}
-function mauTemplateOptionsHtml(selectedValue) {
-  const known = state.templates.some((t) => t.value === selectedValue);
-  let html = !selectedValue || !known ? `<option value="" ${!selectedValue ? "selected" : ""}>— Chọn mẫu hiển thị —</option>` : "";
-  html += state.templates
-    .map((t) => `<option value="${escapeAttr(t.value)}" ${t.value === selectedValue ? "selected" : ""}>${escapeHtml(t.label)}</option>`)
-    .join("");
-  return html;
-}
-function renderMauTable() {
-  const body = $("#mauTableBody");
-  if (!body) return;
-  if (!state.accounts.length) {
-    showToast('Chưa có tài khoản nào — thêm ở tab "Tài khoản" trước khi tạo mẫu chuyển tiền.', "err");
-  }
-  body.innerHTML = "";
-  state.presets.forEach((p, idx) => {
-    const acc = findAccountForPreset(p);
-    const accIdx = acc ? state.accounts.indexOf(acc) : -1;
-    const isAdhoc = !acc && p.bankCode && p.accountNum;
-    const unresolved = !acc && !isAdhoc && (p.accountName || p.accountNum);
-    const tplUnresolved = p.template && !state.templates.some((t) => t.value === p.template);
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Tên mẫu"><input data-mau-idx="${idx}" data-mau-field="name" value="${escapeAttr(p.name || "")}" title="${escapeAttr(p.name || "")}"></td>
-      <td data-label="Tài khoản">
-        <select data-mau-idx="${idx}" data-mau-field="accountSelect" class="${unresolved ? "input-err" : ""}" title="${unresolved ? "Không khớp tài khoản nào đã lưu — chọn lại" : escapeAttr(mauAccountSelectedLabel(accIdx))}">
-          ${mauAccountOptionsHtml(accIdx)}
-        </select>
-      </td>
-      <td data-label="Số tiền"><input data-mau-idx="${idx}" data-mau-field="amount" inputmode="numeric" value="${escapeAttr(p.amount || "")}"></td>
-      <td data-label="Nội dung"><input data-mau-idx="${idx}" data-mau-field="content" value="${escapeAttr(p.content || "")}" title="${escapeAttr(p.content || "")}"></td>
-      <td data-label="Mẫu hiển thị">
-        <select data-mau-idx="${idx}" data-mau-field="templateSelect" class="${tplUnresolved ? "input-err" : ""}" title="${tplUnresolved ? "Mẫu hiển thị này không còn tồn tại — chọn lại" : ""}">
-          ${mauTemplateOptionsHtml(p.template)}
-        </select>
-      </td>
-      <td class="row-actions">
-        <button class="icon-btn order-btn" title="Đưa lên trên" data-mau-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
-        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-mau-move="${idx}" data-dir="1" ${idx === state.presets.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn" title="Xoá dòng" data-mau-tbl-del="${idx}">✕</button>
-      </td>`;
-    body.appendChild(tr);
-  });
-  const countEl = $("#mauSettingsCount");
-  if (countEl) countEl.textContent = `${state.presets.length} mẫu`;
-
-  body.querySelectorAll("input[data-mau-field]").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      const idx = Number(e.target.dataset.mauIdx);
-      const field = e.target.dataset.mauField;
-      const preset = state.presets[idx];
-      if (!preset) return;
-      preset[field] = field === "amount" ? Number(rawNumber(e.target.value)) || 0 : e.target.value;
-      savePresetsCache();
-      markDirty("presets");
-    });
-  });
-  body.querySelectorAll("select[data-mau-field='accountSelect']").forEach((sel) => {
-    sel.addEventListener("change", (e) => {
-      const idx = Number(e.target.dataset.mauIdx);
-      const preset = state.presets[idx];
-      if (!preset) return;
-      const val = e.target.value;
-      const acc = val === "" ? null : state.accounts[Number(val)];
-      preset.accountName = acc ? acc.list_name : "";
-      preset.accountNum = acc ? acc.data_num : "";
-      savePresetsCache();
-      markDirty("presets");
-      renderMauTable();
-    });
-  });
-  body.querySelectorAll("select[data-mau-field='templateSelect']").forEach((sel) => {
-    sel.addEventListener("change", (e) => {
-      const idx = Number(e.target.dataset.mauIdx);
-      const preset = state.presets[idx];
-      if (!preset) return;
-      preset.template = e.target.value;
-      savePresetsCache();
-      markDirty("presets");
-      renderMauTable();
-    });
-  });
-  body.querySelectorAll("[data-mau-move]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.mauMove);
-      const dir = Number(e.currentTarget.dataset.dir);
-      movePresetRow(idx, dir);
-    });
-  });
-  body.querySelectorAll("[data-mau-tbl-del]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.target.dataset.mauTblDel);
-      deleteMauPreset(idx);
-    });
-  });
-}
-function renderVietqrBanksTable(filter) {
-  const body = $("#vietqrBanksTableBody");
-  if (!body) return;
-  const q = (filter || $("#vietqrBankSearch")?.value || "").trim().toLowerCase();
-  const list = !q
-    ? state.refBanks
-    : state.refBanks.filter((b) =>
-        `${b.shortName || ""} ${b.name || ""} ${b.code || ""} ${b.bin || ""}`.toLowerCase().includes(q)
-      );
-  body.innerHTML = "";
-  const yesNo = (v) => (v ? "✓" : "—");
-  list.forEach((b, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td>${b.logo ? `<img src="${escapeAttr(b.logo)}" alt="" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">` : ""}</td>
-      <td data-label="Tên ngân hàng">${escapeHtml(b.shortName || b.short_name || b.name || "")}</td>
-      <td data-label="Tên đầy đủ" title="${escapeAttr(b.name || "")}">${escapeHtml(b.name || "")}</td>
-      <td data-label="Mã">${escapeHtml(b.code || "")}</td>
-      <td data-label="BIN">${escapeHtml(b.bin || "")}</td>
-      <td data-label="Swift">${escapeHtml(b.swift_code || "")}</td>
-      <td data-label="Chuyển" class="cell-center">${yesNo(b.transferSupported)}</td>
-      <td data-label="Tra cứu" class="cell-center">${yesNo(b.lookupSupported)}</td>`;
-    body.appendChild(tr);
-  });
-  const countEl = $("#vietqrBanksCount");
-  if (countEl) countEl.textContent = `${state.refBanks.length} ngân hàng`;
-}
-async function refreshVietqrBanksTab() {
-  await refreshRefBanksFromVietQR();
-  renderVietqrBanksTable();
-}
-
-function addMauRow() {
-  state.presets.push({ name: "", accountName: "", accountNum: "", amount: 0, content: "", template: "" });
-  savePresetsCache();
-  markDirty("presets");
-  renderMauList();
-  const inputs = $("#mauTableBody").querySelectorAll("input[data-mau-field='name']");
-  const last = inputs[inputs.length - 1];
-  if (last) last.focus();
-}
 // So sánh số tiền/nội dung/mẫu hiển thị đang nhập trên form với giá trị đã
 // lưu trong mẫu (preset) đang được chọn — chỉ khi có khác biệt mới cần hiện
 // nút "Cập nhật mẫu" (đổi tài khoản không tính ở đây, vì đổi tài khoản sẽ
@@ -1238,19 +841,6 @@ function deleteMauPreset(idx) {
   });
 }
 
-function movePresetRow(idx, dir) {
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= state.presets.length) return;
-  const tmp = state.presets[idx];
-  state.presets[idx] = state.presets[newIdx];
-  state.presets[newIdx] = tmp;
-  // Giữ đúng mẫu đang được chọn (nếu có) đi theo vị trí mới sau khi đảo chỗ.
-  if (state.selectedPresetIdx === idx) state.selectedPresetIdx = newIdx;
-  else if (state.selectedPresetIdx === newIdx) state.selectedPresetIdx = idx;
-  savePresetsCache();
-  markDirty("presets");
-  renderMauTable();
-}
 function saveCurrentFormAsPreset() {
   const idx = Number($("#qrAccount").value);
   const acc = state.accounts[idx];
@@ -1696,7 +1286,7 @@ function saveAdhocAsAccount() {
   renumberAccountsStt();
   markDirty("accounts");
   populateQrAccounts();
-  showToast(`Đã thêm "${trimmed}" vào danh sách tài khoản — vào Cài đặt ▸ Tài khoản để lưu lên GitHub.`, "ok", { duration: 3600 });
+  showToast(`Đã thêm "${trimmed}" vào danh sách tài khoản (chỉ trong phiên này — nguồn dữ liệu chính là Google Sheet).`, "ok", { duration: 3600 });
 }
 function saveAdhocAsPreset() {
   if (!adhocBank) {
@@ -1748,155 +1338,11 @@ function applyPresetToAdhocForm(preset) {
   generateAdhocQr({ silent: true });
 }
 
-// ---------- Cài đặt: Nội dung chuyển khoản (bảng quản lý) ----------
-function renderContentTable() {
-  const body = $("#contentTableBody");
-  if (!body) return;
-  body.innerHTML = "";
-  state.content.forEach((text, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td class="row-actions">
-        <button class="icon-btn order-btn" title="Đưa lên trên" data-content-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
-        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-content-move="${idx}" data-dir="1" ${idx === state.content.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn" title="Xoá dòng" data-content-del="${idx}">✕</button>
-      </td>`;
-    body.appendChild(tr);
-  });
-  const countEl = $("#contentCount");
-  if (countEl) countEl.textContent = `${state.content.length} dòng`;
-
-  body.querySelectorAll("input[data-content-idx]").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      const idx = Number(e.target.dataset.contentIdx);
-      state.content[idx] = e.target.value;
-      saveContentCache();
-      markDirty("content");
-      renderContentSuggestions();
-    });
-  });
-  body.querySelectorAll("[data-content-move]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.contentMove);
-      const dir = Number(e.currentTarget.dataset.dir);
-      moveContentRow(idx, dir);
-    });
-  });
-  body.querySelectorAll("[data-content-del]").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const idx = Number(e.target.dataset.contentDel);
-      const removed = state.content[idx];
-      const ok = await showConfirm(`Xoá nội dung "${removed}"?`, "Xoá");
-      if (!ok) return;
-      state.content.splice(idx, 1);
-      saveContentCache();
-      markDirty("content");
-      renderContentTable();
-      renderContentSuggestions();
-      showToast(`Đã xoá "${removed}"`, "ok");
-    });
-  });
-}
-function moveContentRow(idx, dir) {
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= state.content.length) return;
-  const tmp = state.content[idx];
-  state.content[idx] = state.content[newIdx];
-  state.content[newIdx] = tmp;
-  saveContentCache();
-  markDirty("content");
-  renderContentTable();
-  renderContentSuggestions();
-}
-function addContentRow() {
-  state.content.push("");
-  saveContentCache();
-  markDirty("content");
-  renderContentTable();
-  const inputs = $("#contentTableBody").querySelectorAll("input[data-content-idx]");
-  const last = inputs[inputs.length - 1];
-  if (last) last.focus();
-}
-
-// ---------- Cài đặt: Số tiền gợi ý (bảng quản lý) ----------
-function renderAmountsTable() {
-  const body = $("#amountsTableBody");
-  if (!body) return;
-  body.innerHTML = "";
-  state.amounts.forEach((amount, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Số tiền gợi ý (đ)"><input data-amount-idx="${idx}" inputmode="numeric" value="${escapeAttr(formatNumber(amount))}" title="${escapeAttr(formatNumber(amount))}"></td>
-      <td class="row-actions">
-        <button class="icon-btn order-btn" title="Đưa lên trên" data-amount-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
-        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-amount-move="${idx}" data-dir="1" ${idx === state.amounts.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn" title="Xoá dòng" data-amount-del="${idx}">✕</button>
-      </td>`;
-    body.appendChild(tr);
-  });
-  const countEl = $("#amountsCount");
-  if (countEl) countEl.textContent = `${state.amounts.length} dòng`;
-
-  body.querySelectorAll("input[data-amount-idx]").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      e.target.value = formatNumber(e.target.value);
-      e.target.title = e.target.value;
-      const idx = Number(e.target.dataset.amountIdx);
-      state.amounts[idx] = Number(rawNumber(e.target.value)) || 0;
-      saveAmountsCache();
-      markDirty("amounts");
-      renderQuickAmountsChips();
-    });
-  });
-  body.querySelectorAll("[data-amount-move]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.amountMove);
-      const dir = Number(e.currentTarget.dataset.dir);
-      moveAmountRow(idx, dir);
-    });
-  });
-  body.querySelectorAll("[data-amount-del]").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const idx = Number(e.target.dataset.amountDel);
-      const removed = state.amounts[idx];
-      const ok = await showConfirm(`Xoá số tiền gợi ý ${formatNumber(removed)}đ?`, "Xoá");
-      if (!ok) return;
-      state.amounts.splice(idx, 1);
-      saveAmountsCache();
-      markDirty("amounts");
-      renderAmountsTable();
-      renderQuickAmountsChips();
-      showToast(`Đã xoá ${formatNumber(removed)}đ`, "ok");
-    });
-  });
-}
-function moveAmountRow(idx, dir) {
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= state.amounts.length) return;
-  const tmp = state.amounts[idx];
-  state.amounts[idx] = state.amounts[newIdx];
-  state.amounts[newIdx] = tmp;
-  saveAmountsCache();
-  markDirty("amounts");
-  renderAmountsTable();
-  renderQuickAmountsChips();
-}
-function addAmountRow() {
-  state.amounts.push(0);
-  saveAmountsCache();
-  markDirty("amounts");
-  renderAmountsTable();
-  const inputs = $("#amountsTableBody").querySelectorAll("input[data-amount-idx]");
-  const last = inputs[inputs.length - 1];
-  if (last) last.focus();
-}
 // ---------- Nút "số tiền nhanh" trên form — nay lấy từ state.amounts (JSON quản lý được) ----------
 function renderQuickAmountsInto(wrapSel, inputSel, onPick) {
   const wrap = $(wrapSel);
   if (!wrap) return;
-  const list = state.amounts && state.amounts.length ? state.amounts : DEFAULT_SUGGESTED_AMOUNTS;
+  const list = state.amounts || [];
   wrap.innerHTML = list
     .map((v) => `<button type="button" class="chip" data-val="${v}">${formatCompactAmount(v)}</button>`)
     .join("");
@@ -1920,100 +1366,6 @@ function formatCompactAmount(v) {
   return formatNumber(n);
 }
 
-// ---------- Cài đặt: Mẫu hiển thị QR (bảng quản lý) ----------
-function renderTemplatesTable() {
-  const body = $("#templatesTableBody");
-  if (!body) return;
-  body.innerHTML = "";
-  const defaultValue = loadDefaults().template || "compact2";
-  state.templates.forEach((t, idx) => {
-    const isDefault = t.value === defaultValue;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="stt-cell">${idx + 1}</td>
-      <td data-label="Value"><input data-tpl-idx="${idx}" data-tpl-field="value" value="${escapeAttr(t.value)}" title="${escapeAttr(t.value)}"></td>
-      <td data-label="Label"><input data-tpl-idx="${idx}" data-tpl-field="label" value="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"></td>
-      <td class="row-actions">
-        <button class="icon-btn${isDefault ? " is-default" : ""}" type="button" title="${isDefault ? "Đang là mẫu mặc định — áp dụng ở mọi nơi (form chính, thêm tài khoản...) mỗi khi mở lại trang" : "Đặt làm mẫu hiển thị mặc định"}" data-tpl-set-default="${idx}">${isDefault ? "★" : "☆"}</button>
-        <button class="icon-btn order-btn" title="Đưa lên trên" data-tpl-move="${idx}" data-dir="-1" ${idx === 0 ? "disabled" : ""}>▲</button>
-        <button class="icon-btn order-btn" title="Đưa xuống dưới" data-tpl-move="${idx}" data-dir="1" ${idx === state.templates.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="icon-btn" title="Xoá dòng" data-tpl-del="${idx}">✕</button>
-      </td>`;
-    body.appendChild(tr);
-  });
-  const countEl = $("#templatesCount");
-  if (countEl) countEl.textContent = `${state.templates.length} mẫu`;
-
-  body.querySelectorAll("input[data-tpl-field]").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      const idx = Number(e.target.dataset.tplIdx);
-      const field = e.target.dataset.tplField;
-      state.templates[idx][field] = e.target.value;
-      saveTemplatesCache();
-      markDirty("templates");
-      populateQrTemplateOptions();
-    });
-  });
-  body.querySelectorAll("[data-tpl-set-default]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.tplSetDefault);
-      const t = state.templates[idx];
-      if (!t || !t.value) return;
-      const defaults = loadDefaults();
-      defaults.template = t.value;
-      localStorage.setItem(LS_DEFAULTS, JSON.stringify(defaults));
-      renderTemplatesTable();
-      // Chỉ đổi mẫu hiển thị đang chọn trên form chính — KHÔNG gọi applyDefaults()
-      // ở đây vì hàm đó áp cả tài khoản mặc định, sẽ vô tình đổi luôn tài khoản
-      // người dùng đang chọn dở trên form chính dù họ chỉ đang đặt mặc định mẫu.
-      $("#qrTemplate").value = t.value;
-      updateCustomSelectTriggerLabel($("#qrTemplate"));
-      showToast(`Đã đặt "${t.label || t.value}" làm mẫu hiển thị mặc định`, "ok");
-    });
-  });
-  body.querySelectorAll("[data-tpl-move]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = Number(e.currentTarget.dataset.tplMove);
-      const dir = Number(e.currentTarget.dataset.dir);
-      moveTemplateRow(idx, dir);
-    });
-  });
-  body.querySelectorAll("[data-tpl-del]").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const idx = Number(e.target.dataset.tplDel);
-      const removed = state.templates[idx];
-      const ok = await showConfirm(`Xoá mẫu hiển thị "${removed.label || removed.value}"?`, "Xoá");
-      if (!ok) return;
-      state.templates.splice(idx, 1);
-      saveTemplatesCache();
-      markDirty("templates");
-      renderTemplatesTable();
-      populateQrTemplateOptions();
-      showToast(`Đã xoá "${removed.label || removed.value}"`, "ok");
-    });
-  });
-}
-function moveTemplateRow(idx, dir) {
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= state.templates.length) return;
-  const tmp = state.templates[idx];
-  state.templates[idx] = state.templates[newIdx];
-  state.templates[newIdx] = tmp;
-  saveTemplatesCache();
-  markDirty("templates");
-  renderTemplatesTable();
-  populateQrTemplateOptions();
-}
-function addTemplateRow() {
-  state.templates.push({ value: "", label: "" });
-  saveTemplatesCache();
-  markDirty("templates");
-  renderTemplatesTable();
-  const inputs = $("#templatesTableBody").querySelectorAll("input[data-tpl-field='value']");
-  const last = inputs[inputs.length - 1];
-  if (last) last.focus();
-}
-
 // ---------- Workspace tabs (Tạo giao dịch / Mẫu giao dịch) ----------
 function switchWorkspaceTab(tabName) {
   $$(".workspace-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.workspaceTab === tabName));
@@ -2021,34 +1373,6 @@ function switchWorkspaceTab(tabName) {
   $("#tab-mau").hidden = tabName !== "mau";
   $("#tab-adhoc").hidden = tabName !== "adhoc";
   if (tabName === "mau") renderMauList();
-}
-
-// ---------- Settings modal (chỉ xem — dữ liệu đọc trực tiếp từ Google Sheet) ----------
-// Khung cửa sổ Cài đặt có chiều cao CỐ ĐỊNH bằng CSS (.gh-panel.settings-panel),
-// nên chuyển tab chỉ cần ẩn/hiện panel — không cần animate chiều cao bằng JS nữa
-// (cách cũ hay bị nhảy/co rồi mất nội dung khi chuyển tab nhanh).
-function switchSettingsTab(tabName) {
-  $$(".settings-tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.settingsTab === tabName));
-
-  $("#settingsTabAccounts").hidden = tabName !== "accounts";
-  $("#settingsTabContent").hidden = tabName !== "content";
-  $("#settingsTabAmounts").hidden = tabName !== "amounts";
-  $("#settingsTabTemplates").hidden = tabName !== "templates";
-  $("#settingsTabMau").hidden = tabName !== "mau";
-  $("#settingsTabVietqrBanks").hidden = tabName !== "vietqr";
-  if (tabName === "accounts") renderTable();
-  if (tabName === "content") renderContentTable();
-  if (tabName === "amounts") renderAmountsTable();
-  if (tabName === "templates") renderTemplatesTable();
-  if (tabName === "mau") renderMauTable();
-  if (tabName === "vietqr") renderVietqrBanksTable();
-}
-function openSettingsModal(tabName) {
-  $("#settingsBackdrop").hidden = false;
-  switchSettingsTab(tabName || "accounts");
-}
-function closeSettingsModal() {
-  $("#settingsBackdrop").hidden = true;
 }
 
 function initRippleEffect() {
@@ -2096,26 +1420,15 @@ async function init() {
   await loadContentInitial();
   await loadAmountsInitial();
 
-  renderTable();
   populateQrTemplateOptions();
   populateQrAccounts();
   renderMauList();
   renderContentSuggestions();
   renderQuickAmountsChips();
-  renderVietqrBanksTable();
   enhanceSelect($("#qrAccount"));
   enhanceSelect($("#qrTemplate"));
   enhanceSelect($("#adhocTemplate"));
   setupAdhocBankInput();
-
-  $("#btnOpenSettings").addEventListener("click", () => openSettingsModal("accounts"));
-  $("#btnSettingsClose").addEventListener("click", closeSettingsModal);
-  $("#settingsBackdrop").addEventListener("click", (e) => {
-    if (e.target.id === "settingsBackdrop") closeSettingsModal();
-  });
-  $$(".settings-tabs .tab").forEach((tab) => {
-    tab.addEventListener("click", () => switchSettingsTab(tab.dataset.settingsTab));
-  });
 
   $$(".workspace-tabs .tab").forEach((tab) => {
     tab.addEventListener("click", () => switchWorkspaceTab(tab.dataset.workspaceTab));
@@ -2132,7 +1445,6 @@ async function init() {
       closeCustomSelect();
       return;
     }
-    if (!$("#settingsBackdrop").hidden) closeSettingsModal();
   });
 
   document.addEventListener("mousedown", (e) => {
@@ -2166,14 +1478,6 @@ async function init() {
     if (bankPickerOpenIdx != null) closeBankPicker();
     if (customSelectOpenEl) closeCustomSelect();
   });
-  $("#btnAddRow").addEventListener("click", addRow);
-  $("#btnRefreshBanks").addEventListener("click", refreshRefBanksFromVietQR);
-  $("#btnAddMauRow").addEventListener("click", addMauRow);
-  $("#btnRefreshBanksVietqrTab").addEventListener("click", refreshVietqrBanksTab);
-  $("#vietqrBankSearch").addEventListener("input", (e) => renderVietqrBanksTable(e.target.value));
-  $("#btnAddContentRow").addEventListener("click", addContentRow);
-  $("#btnAddTemplateRow").addEventListener("click", addTemplateRow);
-  $("#btnAddAmountRow").addEventListener("click", addAmountRow);
   $("#btnUpdatePreset").addEventListener("click", updateSelectedPreset);
   $("#btnSaveAsPreset").addEventListener("click", saveCurrentFormAsPreset);
 
@@ -2246,21 +1550,6 @@ async function init() {
     $$("#quickAmounts .chip").forEach((c) => c.classList.remove("active"));
   });
   $("#qrAmount").addEventListener("input", () => renderAmountSuggestions());
-
-  $("#accountSearch").addEventListener(
-    "input",
-    debounce(() => renderTable(), 200)
-  );
-
-  // Đồng bộ "title" (tooltip khi rê chuột) = giá trị đầy đủ cho mọi ô nhập
-  // trong các bảng quản lý — nội dung dài bị cắt/khuất trong ô nhỏ vẫn xem
-  // được đầy đủ bằng cách rê chuột vào, không cần mở rộng bảng.
-  document.addEventListener("input", (e) => {
-    const el = e.target;
-    if (el.tagName === "INPUT" && el.type !== "password" && el.closest(".table-wrap")) {
-      el.title = el.value;
-    }
-  });
 
   $("#qrForm").addEventListener("submit", (e) => onGenerateQr(e));
   $("#qrAmount").addEventListener("input", (e) => {
