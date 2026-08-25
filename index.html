@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <link rel="icon" type="image/png" href="main.png">
 </head>
 <body>
@@ -43,25 +43,10 @@
     </section>
   </div>
 
-  <div class="modal-backdrop" id="promptBackdrop" hidden>
-    <section class="gh-panel confirm-panel prompt-panel" role="alertdialog" aria-modal="true" aria-label="Nhập mã">
-      <p class="confirm-message" id="promptMessage">Nhập mã:</p>
-      <input class="prompt-input" id="promptInput" type="password" autocomplete="off">
-      <p class="prompt-error" id="promptError" hidden></p>
-      <div class="gh-actions confirm-actions">
-        <button class="btn subtle" id="promptCancelBtn" type="button">Huỷ</button>
-        <button class="btn primary" id="promptOkBtn" type="button">Xác nhận</button>
-      </div>
-    </section>
-  </div>
-
-
   <div class="app-shell">
   <nav class="tabs workspace-tabs">
     <button class="tab active" type="button" data-workspace-tab="qr">Tạo giao dịch</button>
     <button class="tab" type="button" data-workspace-tab="mau">Mẫu giao dịch</button>
-    <button class="tab" type="button" data-workspace-tab="adhoc">Thêm Tài Khoản</button>
-    <button class="tab tab-manage" type="button" data-workspace-tab="quanly">🔒 Quản lý</button>
   </nav>
   <div class="workspace">
 
@@ -90,19 +75,28 @@
 
             <div class="field-row">
               <label class="field">
-                <div class="field-label-row">
-                  <span>Tài khoản nhận</span>
-                  <button type="button" class="link-btn" id="btnSetDefaultAccount" title="Đặt làm tài khoản mặc định (áp dụng khi mở lại trang)">☆</button>
-                </div>
+                <span>Tài khoản nhận</span>
                 <select id="qrAccount"></select>
               </label>
               <label class="field">
-                <div class="field-label-row">
-                  <span>QR Templates</span>
-                  <button type="button" class="link-btn" id="btnSetDefaultTemplate" title="Đặt làm mẫu hiển thị mặc định (áp dụng khi mở lại trang)">☆</button>
-                </div>
+                <span>QR Templates</span>
                 <select id="qrTemplate"></select>
               </label>
+            </div>
+
+            <div class="account-info-card" id="accountInfoCard" hidden>
+              <div class="account-info-row">
+                <span class="account-info-label">Ngân hàng</span>
+                <span class="account-info-value" id="accInfoBank">—</span>
+              </div>
+              <div class="account-info-row">
+                <span class="account-info-label">Số tài khoản</span>
+                <span class="account-info-value mono" id="accInfoNum">—</span>
+              </div>
+              <div class="account-info-row">
+                <span class="account-info-label">Chủ tài khoản</span>
+                <span class="account-info-value" id="accInfoHolder">—</span>
+              </div>
             </div>
           </section>
 
@@ -114,6 +108,7 @@
               <input id="qrAmount" type="text" inputmode="numeric" placeholder="0">
             </label>
             <p class="field-warning" id="qrAmountWarning" hidden></p>
+            <p class="amount-words" id="qrAmountWords" hidden></p>
             <div class="quick-amounts suggest-amounts" id="suggestAmounts" hidden></div>
             <div class="quick-amounts" id="quickAmounts"></div>
 
@@ -131,8 +126,6 @@
 
           <div class="qr-form-actions">
             <button class="btn subtle" type="button" id="btnClearQrForm" title="Xoá số tiền, nội dung đang nhập và bỏ chọn mẫu">🗑 Xoá thông tin</button>
-            <button class="btn subtle" type="button" id="btnSaveAsPreset">💾 Lưu mẫu</button>
-            <button class="btn subtle" type="button" id="btnUpdatePreset" hidden>✎ Cập nhật mẫu</button>
           </div>
 
           <button class="btn primary full" type="submit">Tạo mã QR</button>
@@ -161,131 +154,36 @@
             <a class="btn subtle" id="btnOpenLink" href="#" target="_blank" rel="noopener noreferrer">Mở link ảnh</a>
             <a class="btn primary" id="btnDownload" download="qr-thanh-toan.png">Tải ảnh QR</a>
           </div>
-        </div>
 
-      </div>
-
-    </section>
-
-    <section class="panel" id="tab-adhoc" hidden>
-      <div class="qr-layout">
-
-        <form class="qr-form" id="adhocForm">
-
-          <section class="form-section">
-            <h3 class="form-section-title">Tài khoản nhận </h3>
-            <div class="field-row">
-              <label class="field">
-                <span>Ngân hàng</span>
-                <input type="text" class="bank-input" id="adhocBankInput" autocomplete="off" >
-              </label>
-              <label class="field">
-                <span>Số tài khoản</span>
-                <input id="adhocAccountNum" type="text" autocomplete="off">
-              </label>
+          <div class="qr-summary" id="qrSummary" hidden>
+            <h4 class="qr-summary-title">Chi tiết giao dịch</h4>
+            <div class="qr-summary-row">
+              <span class="qr-summary-label">Ngân hàng</span>
+              <span class="qr-summary-value" id="sumBank">—</span>
             </div>
-            <div class="field-row">
-              <label class="field">
-                <span>Tên chủ tài khoản </span>
-                <input id="adhocAccountName" type="text"  autocomplete="off">
-              </label>
-              <label class="field">
-                <span>QR Templates</span>
-                <select id="adhocTemplate"></select>
-              </label>
+            <div class="qr-summary-row">
+              <span class="qr-summary-label">Số tài khoản</span>
+              <span class="qr-summary-value mono" id="sumAccNum">—</span>
             </div>
-          </section>
-
-          <section class="form-section">
-            <h3 class="form-section-title">Số tiền &amp; nội dung</h3>
-            <label class="field">
-              <span>Số tiền (đ)</span>
-              <input id="adhocAmount" type="text" inputmode="numeric" >
-            </label>
-            <div class="quick-amounts" id="adhocQuickAmounts"></div>
-            <label class="field">
-              <span>Nội dung chuyển khoản</span>
-              <input id="adhocContent" type="text"  maxlength="90" autocomplete="off">
-            </label>
-          </section>
-
-          <div class="qr-form-actions">
-            <button class="btn subtle" type="button" id="btnSaveAdhocAccount">💾 Lưu tài khoản</button>
-            <button class="btn subtle" type="button" id="btnSaveAdhocPreset">💾 Lưu mẫu chuyển tiền</button>
-          </div>
-
-          <button class="btn primary full" type="submit">Tạo mã QR</button>
-        </form>
-
-        <div class="qr-result-wrap">
-          <div class="qr-card" id="adhocQrCard" hidden>
-            <span class="qr-card-stamp">✓ Đã tạo</span>
-            <div class="qr-card-bank" id="adhocQrCardBank">—</div>
-            <div class="qr-card-imgwrap">
-              <img id="adhocQrImageA" alt="Mã QR chuyển khoản" />
-              <img id="adhocQrImageB" alt="Mã QR chuyển khoản" />
+            <div class="qr-summary-row">
+              <span class="qr-summary-label">Chủ tài khoản</span>
+              <span class="qr-summary-value" id="sumHolder">—</span>
+            </div>
+            <div class="qr-summary-row">
+              <span class="qr-summary-label">Số tiền</span>
+              <span class="qr-summary-value" id="sumAmount">—</span>
+            </div>
+            <div class="qr-summary-row">
+              <span class="qr-summary-label">Nội dung</span>
+              <span class="qr-summary-value" id="sumContent">—</span>
+            </div>
+            <div class="qr-summary-row">
+              <span class="qr-summary-label">Mẫu hiển thị</span>
+              <span class="qr-summary-value" id="sumTemplate">—</span>
             </div>
           </div>
-          <div class="qr-empty" id="adhocQrEmpty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-              <path d="M14 14h3v3h-3zM14 20h7M20 14v3M17.5 20v1M20 20v0.01"></path>
-            </svg>
-            <p>Điền thông tin tài khoản rồi bấm <strong>Tạo mã QR</strong>.</p>
-          </div>
-          <div class="qr-actions" id="adhocQrActions" hidden>
-            <button class="btn subtle" id="adhocBtnCopyLink" type="button">Sao chép link ảnh</button>
-            <a class="btn subtle" id="adhocBtnOpenLink" href="#" target="_blank" rel="noopener noreferrer">Mở link ảnh</a>
-            <a class="btn primary" id="adhocBtnDownload" download="qr-thanh-toan.png">Tải ảnh QR</a>
-          </div>
         </div>
 
-      </div>
-
-    </section>
-
-    <section class="panel manage-panel" id="tab-quanly" hidden>
-
-      <div class="manage-gate" id="manageGate">
-        <div class="manage-gate-icon" id="manageGateIcon">🔒</div>
-        <h2 class="manage-gate-title" id="manageGateTitle">Khu vực quản lý</h2>
-        <p class="manage-gate-desc" id="manageGateDesc">Mở khoá bằng vân tay / Face ID / mã PIN của thiết bị này.</p>
-        <button class="btn primary" type="button" id="btnManageAction">Mở khoá bằng Passkey</button>
-        <p class="manage-gate-hint" id="manageGateHint" hidden></p>
-      </div>
-
-      <div class="manage-dashboard" id="manageDashboard" hidden>
-        <div class="manage-head">
-          <h2>Quản lý</h2>
-          <div class="manage-head-actions">
-            <button class="btn subtle" type="button" id="btnManageRefresh">⟳ Làm mới dữ liệu</button>
-            <button class="btn subtle" type="button" id="btnManageLock">🔒 Khoá lại</button>
-          </div>
-        </div>
-
-        <div class="manage-stats" id="manageStats"></div>
-
-        <div class="manage-section">
-          <h3 class="form-section-title">Tài khoản đã lưu</h3>
-          <div class="manage-table-wrap">
-            <table class="manage-table" id="manageAccountsTable"></table>
-          </div>
-        </div>
-
-        <div class="manage-section">
-          <h3 class="form-section-title">Mẫu giao dịch</h3>
-          <div class="manage-table-wrap">
-            <table class="manage-table" id="managePresetsTable"></table>
-          </div>
-        </div>
-
-        <div class="manage-section manage-danger">
-          <h3 class="form-section-title">Thiết bị &amp; khoá truy cập</h3>
-          <p class="manage-danger-desc">Passkey chỉ lưu trên thiết bị/trình duyệt này (không lưu trên GitHub hay bất kỳ server nào) — mỗi thiết bị cần tự thiết lập riêng.</p>
-          <button class="btn subtle danger-outline" type="button" id="btnManageResetPasskey">Gỡ khoá thiết bị này</button>
-        </div>
       </div>
 
     </section>
@@ -302,10 +200,6 @@
 </div>
 
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-
-<div class="bank-picker-popup" id="bankPickerPopup" hidden>
-  <div class="bank-picker-list" id="bankPickerList"></div>
-</div>
 
 <div class="custom-select-panel" id="customSelectPanel" hidden>
   <div class="custom-select-list" id="customSelectList"></div>
