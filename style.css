@@ -6,46 +6,47 @@
    ========================================================= */
 
 :root{
-  --bg:#F4F6FB;
-  --bg-2:#FFFFFF;
-  --panel:#FFFFFF;
-  --panel-2:#F1F4FA;
-  --border:#E4E9F2;
-  --border-strong:#CBD4E4;
+  --bg:#0B0F14;
+  --bg-2:#121820;
+  --panel:rgba(255,255,255,0.04);
+  --panel-2:#161C26;
+  --panel-solid:#161C26;
+  --border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.14);
 
-  --ink:#1B2436;
-  --ink-dim:#5B6780;
-  --ink-faint:#8D97AC;
+  --ink:#E8EEF7;
+  --ink-dim:#8B97AB;
+  --ink-faint:#5C6A80;
 
-  --accent:#0F9D74;
-  --accent-bright:#12B588;
-  --accent-dark:#0B7D5C;
-  --accent-wash:rgba(15,157,116,.10);
+  --accent:#00E5A0;
+  --accent-bright:#2CFFC0;
+  --accent-dark:#00B884;
+  --accent-wash:rgba(0,229,160,.12);
 
-  --violet:#6C5CE7;
-  --violet-bright:#7C6CF0;
-  --violet-wash:rgba(108,92,231,.10);
+  --violet:#7B6CFF;
+  --violet-bright:#9A8CFF;
+  --violet-wash:rgba(123,108,255,.14);
 
-  --gold:#DB9A1F;
-  --gold-bright:#E8AC34;
-  --gold-wash:rgba(219,154,31,.12);
+  --gold:#E8B84A;
+  --gold-bright:#F5CA66;
+  --gold-wash:rgba(232,184,74,.14);
 
-  --ok:#0F9D74;
-  --danger:#E1483F;
+  --ok:#00E5A0;
+  --danger:#FF5C5C;
 
-  --glow-1:rgba(15,157,116,.14);
-  --glow-2:rgba(108,92,231,.12);
-  --glow-3:rgba(219,154,31,.10);
+  --glow-1:rgba(0,229,160,.20);
+  --glow-2:rgba(123,108,255,.20);
+  --glow-3:rgba(232,184,74,.14);
 
-  --glass-blur:0px;
-  --panel-shadow:0 1px 2px rgba(20,30,60,.04), 0 10px 26px -18px rgba(20,30,60,.14);
-  --card-glow:0 20px 44px -22px rgba(20,30,60,.22), 0 0 0 1px rgba(20,30,60,.04);
+  --glass-blur:14px;
+  --panel-shadow:0 1px 2px rgba(0,0,0,.2), 0 14px 32px -18px rgba(0,0,0,.5);
+  --card-glow:0 24px 48px -22px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.05);
 
   --body:'Inter',sans-serif;
   --display:'Space Grotesk',sans-serif;
   --mono:'JetBrains Mono',monospace;
-  --radius:16px;
-  --radius-sm:10px;
+  --radius:22px;
+  --radius-sm:13px;
 }
 
 *{box-sizing:border-box;}
@@ -120,6 +121,10 @@ table,thead th,tbody td,.mau-card,.mau-panel,.toast,
 .combo-menu,.footer,.gh-status-pill,.brand-mark,.count-badge,.field,
 .hint,.status{
   transition:background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease;
+}
+
+.topbar,.workspace,.form-section,.qr-summary,.mau-card,.workspace-tabs,.table-wrap,.gh-status-pill,.qr-empty{
+  -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
 }
 
 .app{max-width:min(1600px, 96vw);margin:0 auto;min-height:100vh;background:transparent;padding:18px 18px 0;}
@@ -305,13 +310,14 @@ input::placeholder{color:var(--ink-faint);}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   transition:color .15s ease, background-color .15s ease, box-shadow .15s ease;
 }
-.tab:hover{color:var(--ink-dim);}
+.tab:hover{color:var(--ink-dim);background:rgba(255,255,255,.05);}
 .tab[hidden]{display:none;}
 .tab.active{
   color:#fff;font-weight:700;
   background:linear-gradient(120deg, var(--accent), var(--violet));
   box-shadow:0 6px 16px -6px var(--glow-1);
 }
+.tab-icon{width:16px;height:16px;flex:none;opacity:.85;}
 
 .workspace-tabs{max-width:360px;}
 
@@ -421,7 +427,7 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 
 /* ---------- "Tạo giao dịch": rearranged as [kết quả QR] bên trái, [form nhập] bên phải ---------- */
 .qr-layout{
-  display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1.15fr);gap:18px;align-items:start;
+  display:grid;grid-template-columns:minmax(320px,380px) minmax(0,1fr);gap:26px;align-items:start;
   max-width:1040px;margin:0 auto;
 }
 .qr-layout .qr-result-wrap{order:1;}
@@ -475,17 +481,18 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 .account-info-value{font-size:12px;font-weight:600;color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .account-info-value.mono{font-family:var(--mono);}
 
-.qr-result-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:340px;margin:0 auto;}
+.qr-result-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:380px;margin:0 auto;}
 
 .qr-empty{
   border:1px dashed var(--border);border-radius:var(--radius);
-  width:100%;min-height:260px;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:12px;
+  width:100%;min-height:300px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;
   color:var(--ink-faint);font-size:12.5px;text-align:center;padding:14px;
   background:var(--panel);
 }
-.qr-empty svg{opacity:.35;color:var(--accent);width:64px;height:64px;}
+.qr-empty svg{opacity:.4;color:var(--accent);width:60px;height:60px;filter:drop-shadow(0 0 18px var(--glow-1));}
 .qr-empty p{margin:0;max-width:220px;}
+.qr-empty p strong{color:var(--ink-dim);}
 
 .field-counter{font-size:10.5px;color:var(--ink-faint);text-align:right;margin-top:3px;}
 .field-counter.warn{color:var(--gold-bright);}
@@ -536,7 +543,7 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 }
 .qr-card{
   position:relative;
-  width:100%;max-width:340px;
+  width:100%;max-width:380px;
   background:var(--bg-2);
   border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;
   padding:16px 16px 20px;
@@ -566,7 +573,7 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 }
 .qr-card-bank{
   font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--accent-dark);margin:2px 0 10px;
+  color:var(--accent-bright);margin:2px 0 10px;
   max-width:calc(100% - 70px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .qr-card-imgwrap{position:relative;width:100%;aspect-ratio:1/1.15;}
@@ -578,12 +585,12 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 }
 .qr-card-imgwrap img.visible{opacity:1;}
 
-.qr-actions{display:flex;gap:8px;width:100%;max-width:340px;flex-wrap:wrap;}
+.qr-actions{display:flex;gap:8px;width:100%;max-width:380px;flex-wrap:wrap;}
 .qr-actions .btn{flex:1;justify-content:center;min-width:100px;}
 
 /* ---------- Thẻ tóm tắt chi tiết giao dịch — nằm dưới mã QR ---------- */
 .qr-summary{
-  width:100%;max-width:340px;
+  width:100%;max-width:380px;
   background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
   padding:13px 15px 14px;box-shadow:var(--panel-shadow);
   display:flex;flex-direction:column;gap:8px;
@@ -687,8 +694,8 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
 @media (max-width:760px){
   .gh-grid{grid-template-columns:1fr;}
   .qr-layout{grid-template-columns:1fr;}
-  .qr-layout .qr-result-wrap{order:0;}
-  .qr-layout .qr-form{order:1;}
+  .qr-layout .qr-form{order:0;}
+  .qr-layout .qr-result-wrap{order:1;max-width:none;}
   .field-row{grid-template-columns:1fr;gap:0;}
   .field-row .field{margin-bottom:11px;}
   .field-row .field:last-child{margin-bottom:0;}
@@ -710,7 +717,7 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
   .field span{font-size:12px;}
   input,select{font-size:13px;padding:9px 11px;}
   .qr-form .btn.full{padding:11px;font-size:13.5px;margin-top:2px;}
-  .qr-card,.qr-actions,.qr-summary{max-width:340px;}
+  .qr-card,.qr-actions,.qr-summary{max-width:380px;}
   .qr-empty{min-height:320px;font-size:13px;}
 }
 
@@ -730,6 +737,17 @@ td select.input-err{border-color:var(--danger);box-shadow:0 0 0 3px rgba(225,72,
     position:sticky;top:82px;
     box-shadow:var(--panel-shadow);
   }
-  .workspace-tabs .tab{flex:0 0 auto;justify-content:flex-start;padding:11px 12px;font-size:12.5px;}
+  .workspace-tabs{background:var(--panel-solid);}
+  .workspace-tabs .tab{
+    flex:0 0 auto;justify-content:flex-start;padding:11px 12px 11px 13px;font-size:12.5px;
+    border-radius:var(--radius-sm);border-left:3px solid transparent;
+  }
+  .workspace-tabs .tab:hover{background:rgba(255,255,255,.06);color:var(--ink-dim);}
+  .workspace-tabs .tab.active{
+    color:var(--ink);font-weight:700;
+    background:linear-gradient(90deg, var(--accent-wash), transparent 85%);
+    border-left-color:var(--accent);box-shadow:none;
+  }
+  .workspace-tabs .tab.active .tab-icon{color:var(--accent);opacity:1;}
   .workspace{flex:1 1 auto;min-width:0;}
 }
