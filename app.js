@@ -76,23 +76,26 @@ function pick(row, ...keys) {
 
 async function loadAccountsFromSheet() {
   const rows = await fetchSheetTab(SHEET_TABS.accounts);
-  return rows.map((r) => {
-    const shortName = pick(r, "data__short_name", "data__shortName", "data__name");
-    return {
-      list_name: pick(r, "list_name"),
-      name_ac: pick(r, "name_ac"),
-      data_num: pick(r, "data_num"),
-      data__code: pick(r, "data__code"),
-      data__name: shortName,
-      data__shortName: shortName,
-      data__short_name: shortName,
-      data__bin: pick(r, "data__bin"),
-      data__logo: pick(r, "data__logo"),
-      vietqr_link: pick(r, "vietqr_link"),
-      hidden: sheetBool(pick(r, "hidden")),
-      isDefault: sheetBool(pick(r, "isDefault", "is_default")),
-    };
-  });
+  return rows
+    .map((r) => {
+      const shortName = pick(r, "data__short_name", "data__shortName", "data__name");
+      return {
+        list_name: pick(r, "list_name"),
+        name_ac: pick(r, "name_ac"),
+        data_num: pick(r, "data_num"),
+        data__code: pick(r, "data__code"),
+        data__name: shortName,
+        data__shortName: shortName,
+        data__short_name: shortName,
+        data__bin: pick(r, "data__bin"),
+        data__logo: pick(r, "data__logo"),
+        vietqr_link: pick(r, "vietqr_link"),
+        hidden: sheetBool(pick(r, "hidden")),
+        isDefault: sheetBool(pick(r, "isDefault", "is_default")),
+      };
+    })
+    .filter((a) => a.data_num && a.data__code); // bỏ dòng rác trên Sheet (vd. ô lẻ còn sót chữ ở cột khác) không phải tài khoản thật —
+  // 1 tài khoản hợp lệ BẮT BUỘC phải có số tài khoản + mã ngân hàng, thiếu 1 trong 2 thì không tạo được QR nên loại luôn ở đây.
 }
 
 async function loadPresetsFromSheet() {
@@ -118,6 +121,7 @@ async function loadTemplatesFromSheet() {
   return rows.map((r) => ({
     value: pick(r, "value"),
     label: pick(r, "label"),
+    isDefault: sheetBool(pick(r, "default")),
   }));
 }
 
@@ -282,10 +286,61 @@ function saveContentCache() {}
 function saveAmountsCache() {}
 function saveTemplatesCache() {}
 
+// ---------- Cache dữ liệu Sheet vào trình duyệt để tiết kiệm thời gian load ----------
+// Chiến lược "cache trước, làm mới sau" (stale-while-revalidate):
+// - Lần mở đầu tiên trên máy/trình duyệt này: chưa có cache → vẫn phải chờ tải từ
+//   Google Sheet như bình thường (không có gì để "tiết kiệm" ở lần đầu).
+// - Những lần mở sau: hiện NGAY dữ liệu đã lưu lần trước (gần như tức thì, không
+//   chờ mạng), đồng thời âm thầm tải bản mới nhất từ Google Sheet ở nền — tải xong
+//   thì tự cập nhật lại UI. Nếu mạng lỗi/Sheet đổi cấu trúc, vẫn còn dữ liệu cũ để dùng.
+const SHEET_CACHE_PREFIX = "vietqr_sheet_cache_";
+const SHEET_CACHE_VERSION = 1; // tăng số này khi đổi cấu trúc field để tự bỏ qua cache cũ không còn khớp
+
+function readSheetCache(key) {
+  try {
+    const raw = localStorage.getItem(SHEET_CACHE_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.v !== SHEET_CACHE_VERSION || !Array.isArray(parsed.data)) return null;
+    return parsed.data;
+  } catch (e) {
+    return null;
+  }
+}
+function writeSheetCache(key, data) {
+  try {
+    localStorage.setItem(SHEET_CACHE_PREFIX + key, JSON.stringify({ v: SHEET_CACHE_VERSION, data, ts: Date.now() }));
+  } catch (e) {
+    // Bỏ qua nếu localStorage đầy/bị chặn — app vẫn chạy được, chỉ là không cache được.
+  }
+}
+// cacheKey: tên để lưu trong localStorage (khác SHEET_TABS để dễ đọc log).
+// fetchFn: hàm async trả về dữ liệu đã map sẵn (vd. loadAccountsFromSheet).
+// onFresh: gọi lại khi bản mới tải xong Ở NỀN (sau khi đã trả cache cũ) — dùng để
+// cập nhật state + render lại UI phần tương ứng.
+function loadCachedSection(cacheKey, fetchFn, onFresh) {
+  const cached = readSheetCache(cacheKey);
+  if (cached) {
+    fetchFn()
+      .then((fresh) => {
+        writeSheetCache(cacheKey, fresh);
+        onFresh(fresh);
+      })
+      .catch((e) => console.warn(`Làm mới "${cacheKey}" từ Google Sheet thất bại, tạm dùng dữ liệu đã lưu trước đó:`, e));
+    return Promise.resolve(cached);
+  }
+  return fetchFn().then((fresh) => {
+    writeSheetCache(cacheKey, fresh);
+    return fresh;
+  });
+}
+
 // ---------- Ngân hàng (nguồn: tab "Banks" trong Google Sheet) ----------
 async function loadRefBanks() {
   try {
-    state.refBanks = await loadBanksFromSheet();
+    state.refBanks = await loadCachedSection("banks", loadBanksFromSheet, (fresh) => {
+      state.refBanks = fresh;
+    });
   } catch (e) {
     console.error(e);
     state.refBanks = [];
@@ -457,7 +512,12 @@ function enhanceSelect(selectEl) {
 // ---------- Tài khoản (nguồn: tab "TaiKhoan" trong Google Sheet) ----------
 async function loadAccountsInitial() {
   try {
-    state.accounts = normalizeAccountFields(await loadAccountsFromSheet());
+    const rows = await loadCachedSection("accounts", loadAccountsFromSheet, (fresh) => {
+      state.accounts = normalizeAccountFields(fresh);
+      sortAccountsByStt();
+      populateQrAccounts();
+    });
+    state.accounts = normalizeAccountFields(rows);
   } catch (e) {
     console.error(e);
     state.accounts = [];
@@ -468,7 +528,10 @@ async function loadAccountsInitial() {
 // ---------- Mẫu chuyển tiền (nguồn: tab "MauChuyenTien") ----------
 async function loadPresetsInitial() {
   try {
-    state.presets = await loadPresetsFromSheet();
+    state.presets = await loadCachedSection("presets", loadPresetsFromSheet, (fresh) => {
+      state.presets = fresh;
+      renderMauList();
+    });
   } catch (e) {
     console.error(e);
     state.presets = [];
@@ -478,9 +541,16 @@ async function loadPresetsInitial() {
 // ---------- Nội dung chuyển khoản gợi ý (nguồn: tab "NoiDungGoiY") ----------
 async function loadContentInitial() {
   try {
-    state.content = await loadContentFromSheet();
+    state.content = await loadCachedSection("content", loadContentFromSheet, (fresh) => {
+      state.content = fresh;
+      renderContentSuggestions();
+    });
   } catch (e) {
-    console.error(e);
+    // Tab "NoiDungGoiY" có thể chưa được tạo trên Google Sheet — đây là tính
+    // năng tuỳ chọn (gợi ý nội dung chuyển khoản), không chặn app hoạt động,
+    // nên không hiện toast lỗi làm phiền mỗi lần mở trang. Vẫn log ra console
+    // để dễ tra khi cần debug.
+    console.warn('Không đọc được tab "NoiDungGoiY" (gợi ý nội dung) — có thể tab này chưa tồn tại trên Google Sheet:', e);
     state.content = [];
   }
 }
@@ -488,7 +558,10 @@ async function loadContentInitial() {
 // ---------- Số tiền gợi ý (nguồn: tab "SoTienGoiY") ----------
 async function loadAmountsInitial() {
   try {
-    state.amounts = await loadAmountsFromSheet();
+    state.amounts = await loadCachedSection("amounts", loadAmountsFromSheet, (fresh) => {
+      state.amounts = fresh;
+      renderQuickAmountsChips();
+    });
   } catch (e) {
     console.error(e);
     state.amounts = [];
@@ -499,7 +572,10 @@ async function loadAmountsInitial() {
 // ---------- Mẫu hiển thị QR (nguồn: tab "MauHienThi") ----------
 async function loadTemplatesInitial() {
   try {
-    state.templates = await loadTemplatesFromSheet();
+    state.templates = await loadCachedSection("templates", loadTemplatesFromSheet, (fresh) => {
+      state.templates = fresh;
+      populateQrTemplateOptions();
+    });
   } catch (e) {
     console.error(e);
     state.templates = [];
@@ -557,6 +633,17 @@ function findAccountForPreset(preset) {
     }) || null
   );
 }
+// Thứ tự ưu tiên mẫu hiển thị mặc định:
+// 1) Người dùng đã tự đặt qua nút ☆ (lưu trong localStorage) — luôn ưu tiên cao nhất.
+// 2) Dòng được đánh dấu default=TRUE trong tab "MauHienThi" trên Google Sheet.
+// 3) "compact2" — chỉ dùng khi 2 nguồn trên đều không có.
+function getDefaultTemplateValue() {
+  const saved = loadDefaults().template;
+  if (saved) return saved;
+  const sheetDefault = state.templates.find((t) => t.isDefault);
+  if (sheetDefault) return sheetDefault.value;
+  return "compact2";
+}
 function loadDefaults() {
   try {
     return JSON.parse(localStorage.getItem(LS_DEFAULTS) || "{}");
@@ -576,7 +663,7 @@ function applyDefaults() {
     const idx = state.accounts.findIndex((a) => accountKey(a) === defaults.accountKey && !a.hidden);
     if (idx >= 0) $("#qrAccount").value = idx;
   }
-  $("#qrTemplate").value = defaults.template || "compact2";
+  $("#qrTemplate").value = getDefaultTemplateValue();
 }
 function setDefaultAccount() {
   const idx = Number($("#qrAccount").value);
@@ -671,7 +758,7 @@ function restoreFormState() {
 
 function populateQrTemplateOptions() {
   const optionsHtml = state.templates.map((t) => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join("");
-  const defaultTemplate = loadDefaults().template || "compact2";
+  const defaultTemplate = getDefaultTemplateValue();
   [$("#qrTemplate"), $("#adhocTemplate")].forEach((sel) => {
     if (!sel) return;
     const prev = sel.value;
